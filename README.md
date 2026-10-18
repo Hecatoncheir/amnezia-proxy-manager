@@ -58,4 +58,15 @@ go build -o ../build/proxy-engine ./cmd/proxy-engine
 
 Сборка Flutter на каждой ОС выполняется на её собственном runner. CI собирает каркас, но не подтверждает работу VPN и не выпускает установщики. Реальные профили, ключи и журналы с секретами не должны попадать в Git.
 
+## Выпуски и обновление версии
+
+[История изменений](Changelog.md) · [Подготовка и публикация выпуска](docs/RELEASING.md)
+
+После заполнения `Unreleased` выполните `python tools/release.py prepare v0.1.1`:
+команда обновит `pubspec.yaml`, увеличит номер сборки и подготовит раздел changelog.
+Отправка тега `v0.1.1` запускает проверки, сборки Windows x64, macOS arm64 и Linux x64,
+затем публикацию архивов и SHA-256 в [GitHub Releases](https://github.com/Hecatoncheir/amnezia-proxy-manager/releases).
+Предварительные теги вида `v0.1.1-rc.1` создают prerelease. Обновление пока ручное,
+через скачивание и распаковку новой версии; архивы не подписаны.
+
 Рекомендуемое описание GitHub: «Кроссплатформенный менеджер SOCKS5/HTTP-прокси AmneziaWG на Flutter и Go». Topics: `flutter`, `golang`, `amneziawg`, `socks5`, `proxy`, `windows`, `macos`, `linux`, `gruvbox`. Сайт пока не опубликован; настройки удалённого репозитория этим коммитом не меняются.

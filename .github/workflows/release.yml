@@ -1,0 +1,141 @@
+name: Выпуск приложения
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m unittest discover -s tools -p 'test_*.py'
+      - name: Проверка тега, версии и описания
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: python tools/release.py check "$RELEASE_TAG"
+  build:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            target: windows
+            arch: x64
+          - os: macos-15
+            target: macos
+            arch: arm64
+          - os: ubuntu-24.04
+            target: linux
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.0'
+          cache: false
+      - name: Проверки Go
+        working-directory: engine
+        run: |
+          go test ./...
+          go vet ./...
+      - name: Зависимости Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.7'
+          channel: stable
+          cache: true
+      - name: Зависимости Flutter
+        working-directory: apps/desktop
+        run: flutter pub get
+      - name: Проверки Flutter
+        working-directory: apps/desktop
+        run: |
+          dart format --output=none --set-exit-if-changed lib test
+          flutter analyze
+          flutter test
+      - name: Сборка
+        working-directory: apps/desktop
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          version=${RELEASE_TAG#v}
+          flutter build ${{ matrix.target }} --release --build-name "${version%%-*}"
+      - name: Архив Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $bundle = 'apps/desktop/build/windows/x64/runner/Release'
+          Push-Location engine
+          go build -trimpath -o "../$bundle/proxy-engine.exe" ./cmd/proxy-engine
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Pop-Location
+          Copy-Item Changelog.md $bundle
+          Compress-Archive -Path "$bundle/*" -DestinationPath "dist/AmneziaProxyManager-$env:RELEASE_TAG-windows-x64.zip"
+      - name: Архив macOS
+        if: runner.os == 'macOS'
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist
+          bundle=apps/desktop/build/macos/Build/Products/Release
+          (cd engine && go build -trimpath -o ../"$bundle"/proxy-engine ./cmd/proxy-engine)
+          cp Changelog.md "$bundle/"
+          tar -czf "dist/AmneziaProxyManager-$RELEASE_TAG-macos-arm64.tar.gz" -C "$bundle" amnezia_proxy_manager.app proxy-engine Changelog.md
+      - name: Архив Linux
+        if: runner.os == 'Linux'
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          mkdir -p dist
+          bundle=apps/desktop/build/linux/x64/release/bundle
+          (cd engine && go build -trimpath -o ../"$bundle"/proxy-engine ./cmd/proxy-engine)
+          cp Changelog.md "$bundle/"
+          tar -czf "dist/AmneziaProxyManager-$RELEASE_TAG-linux-x64.tar.gz" -C "$bundle" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+  publish:
+    needs: [validate, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - name: Описание и контрольные суммы
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 tools/release.py notes "$RELEASE_TAG" --output release-notes.md
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 3
+          (cd dist && sha256sum -- *.zip *.tar.gz > SHA256SUMS.txt)
+      - name: Публикация
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          flags=()
+          if [[ "$RELEASE_TAG" == *-* ]]; then flags+=(--prerelease --latest=false); fi
+          gh release create "$RELEASE_TAG" dist/* --verify-tag --title "Amnezia Proxy Manager $RELEASE_TAG" --notes-file release-notes.md "${flags[@]}"

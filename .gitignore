@@ -21,3 +21,4 @@ Thumbs.db
 *.pem
 /profiles/
 /secrets/
+__pycache__/
