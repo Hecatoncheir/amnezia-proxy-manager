@@ -30,6 +30,8 @@ type Request struct {
 	Binary        string `json:"binary,omitempty"`
 	SHA256        string `json:"sha256,omitempty"`
 	Configuration string `json:"configuration,omitempty"`
+	SocksPort     *int   `json:"socksPort,omitempty"`
+	HTTPPort      *int   `json:"httpPort,omitempty"`
 }
 type State struct {
 	Status       string `json:"status"`
@@ -86,11 +88,11 @@ func (m *Manager) Start(r Request) error {
 	if m.active != nil {
 		return errors.New("already_running")
 	}
-	if len(r.Configuration) == 0 || len(r.Configuration) > validation.MaxConfig {
-		return errors.New("invalid_config")
+	if err := r.validate(); err != nil {
+		return err
 	}
-	if r.Family != "awg" && r.Family != "xray" {
-		return errors.New("unsupported_engine")
+	if err := m.configurePorts(r); err != nil {
+		return err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &running{ctx: ctx, cancel: cancel, done: make(chan struct{})}
@@ -100,6 +102,16 @@ func (m *Manager) Start(r Request) error {
 		m.publish(m.state)
 	}
 	go m.run(s, r)
+	return nil
+}
+
+func (r Request) validate() error {
+	if len(r.Configuration) == 0 || len(r.Configuration) > validation.MaxConfig {
+		return errors.New("invalid_config")
+	}
+	if r.Family != "awg" && r.Family != "xray" {
+		return errors.New("unsupported_engine")
+	}
 	return nil
 }
 func (m *Manager) Stop() error {

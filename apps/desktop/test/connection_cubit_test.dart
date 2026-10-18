@@ -29,6 +29,8 @@ class FakeSupervisor extends SupervisorClient {
     required String binary,
     required String sha256,
     required String configuration,
+    int socksPort = 1080,
+    int httpPort = 8080,
   }) async {
     starts++;
   }

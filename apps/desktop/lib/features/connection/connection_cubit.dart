@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../settings/proxy_ports.dart';
+
 import '../engine/engine_manager.dart';
 import '../engine/engine_store.dart';
 import '../profiles/profile_codec.dart';
@@ -32,6 +34,7 @@ class ConnectionCubit extends Cubit<ProxyConnectionState> {
     required this.awg,
     required this.xray,
     this.prepare,
+    this.readPorts,
     SupervisorClient? client,
   }) : client = client ?? SupervisorClient(),
        super(const ProxyConnectionState(ConnectionStatus.disconnected)) {
@@ -40,6 +43,7 @@ class ConnectionCubit extends Cubit<ProxyConnectionState> {
   final ProfilesCubit profiles;
   final EngineManager awg, xray;
   final Future<void> Function()? prepare;
+  final Future<ProxyPorts> Function()? readPorts;
   final SupervisorClient client;
   late final StreamSubscription<Map<String, dynamic>> _subscription;
   var _generation = 0;
@@ -91,6 +95,7 @@ class ConnectionCubit extends Cubit<ProxyConnectionState> {
     emit(const ProxyConnectionState(ConnectionStatus.starting));
     try {
       await prepare?.call();
+      final ports = await _portsForConnection();
       if (generation != _generation || _closed != null) return;
       await profiles.withSelectedForConnection((family, configuration) async {
         final engine = family == 'xray' ? xray : awg;
@@ -115,6 +120,8 @@ class ConnectionCubit extends Cubit<ProxyConnectionState> {
           binary: store.executable(release).absolute.path,
           sha256: release.binary.sha256,
           configuration: configuration,
+          socksPort: ports.socks,
+          httpPort: ports.http,
         );
       });
     } catch (error) {
@@ -129,6 +136,14 @@ class ConnectionCubit extends Cubit<ProxyConnectionState> {
           ),
         );
       }
+    }
+  }
+
+  Future<ProxyPorts> _portsForConnection() async {
+    try {
+      return await readPorts?.call() ?? const ProxyPorts();
+    } on FormatException catch (error) {
+      throw ProfileProblem(error.message);
     }
   }
 
@@ -174,7 +189,10 @@ class ConnectionCubit extends Cubit<ProxyConnectionState> {
 
 String _message(Object? code) => switch (code) {
   'missing_engine' => 'Не удалось подготовить движок. Проверьте доступ к GitHub; повторить загрузку можно в меню «Движки».',
-  'port_in_use' => 'Порт 1080 или 8080 занят другим приложением.',
+  'port_in_use' => 'Не удалось открыть выбранные порты: они заняты или недоступны. Измените порты на главном экране.',
+  'invalid_ports' => 'Укажите разные порты SOCKS5 и HTTP от 1 до 65535.',
+  'unsupported_ports' =>
+    'Обновите приложение: компонент подключения не поддерживает выбор портов.',
   'untrusted_engine' => 'Движок не прошёл проверку. Скачайте его заново.',
   'invalid_config' =>
     'Движок отклонил профиль. Проверьте или импортируйте его заново.',

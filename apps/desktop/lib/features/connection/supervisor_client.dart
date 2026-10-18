@@ -25,6 +25,7 @@ class SupervisorClient {
   Future<void>? _launching, _closing;
   var _next = 0;
   var _dead = false;
+  var _supportsPorts = false;
 
   Future<void> _launch() async {
     try {
@@ -58,6 +59,7 @@ class SupervisorClient {
       _fail();
       throw const SessionProblem('protocol_mismatch');
     }
+    _supportsPorts = capabilities.contains('custom_ports');
   }
 
   void _read(List<int> bytes) {
@@ -81,6 +83,7 @@ class SupervisorClient {
                 'invalid_config',
                 'unsupported_engine',
                 'stop_timeout',
+                'invalid_ports',
               };
               completer.completeError(
                 SessionProblem(
@@ -149,6 +152,8 @@ class SupervisorClient {
     required String binary,
     required String sha256,
     required String configuration,
+    int socksPort = 1080,
+    int httpPort = 8080,
   }) async {
     if (_closing != null) throw const SessionProblem('ipc_failed');
     if (_dead) {
@@ -157,11 +162,16 @@ class SupervisorClient {
       _launching = null;
     }
     await (_launching ??= _launch());
+    if (!_supportsPorts && (socksPort != 1080 || httpPort != 8080)) {
+      throw const SessionProblem('unsupported_ports');
+    }
     await _request('start', {
       'family': family,
       'binary': binary,
       'sha256': sha256,
       'configuration': configuration,
+      'socksPort': socksPort,
+      'httpPort': httpPort,
     });
   }
 

@@ -11,9 +11,14 @@ Future<void> main() async {
       'ok': true,
     };
     if (request['method'] == 'hello') {
-      response['capabilities'] = ['start', 'stop', 'status'];
+      response['capabilities'] = ['start', 'stop', 'status', 'custom_ports'];
     }
     if (request['method'] == 'start') {
+      if (request['configuration'] == 'custom_ports') {
+        response['ok'] =
+            request['socksPort'] == 19080 && request['httpPort'] == 19081;
+        response['code'] = 'invalid_ports';
+      }
       if (request['configuration'] == 'crash') exit(7);
       if (request['configuration'] == 'bad_version') response['version'] = 2;
       if (request['configuration'] == 'oversized') {

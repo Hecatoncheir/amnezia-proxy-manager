@@ -62,7 +62,7 @@ func serveContext(ctx context.Context, input io.Reader, output io.Writer) error 
 		switch request.Method {
 		case "hello":
 			negotiated = true
-			response["capabilities"] = []string{"start", "stop", "status"}
+			response["capabilities"] = []string{"start", "stop", "status", "custom_ports"}
 			response["maxConfigBytes"] = 65536
 		case "status":
 			if !negotiated {

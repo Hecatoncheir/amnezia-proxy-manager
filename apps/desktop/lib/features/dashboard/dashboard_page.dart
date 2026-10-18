@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../settings/settings_cubit.dart';
 import '../../settings/startup_cubit.dart';
+import '../../settings/proxy_ports_cubit.dart';
 import '../../settings/window_placement.dart';
 import '../connection/connection_cubit.dart';
 import '../updates/updates_view.dart';
@@ -17,6 +18,7 @@ import '../profiles/profiles_cubit.dart';
 import '../profiles/profiles_view.dart';
 import 'preparation_cubit.dart';
 import 'preparation_view.dart';
+import 'proxy_ports_view.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key, this.engine, this.profiles, this.xray});
@@ -31,6 +33,7 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   ConnectionCubit? _connection;
   StartupCubit? _startup;
+  final _ports = ProxyPortsCubit();
   late final Future<void> _initialization;
   @override
   void initState() {
@@ -42,6 +45,7 @@ class _DashboardPageState extends State<DashboardPage> {
         profiles: widget.profiles!,
         awg: widget.engine!,
         xray: widget.xray!,
+        readPorts: _ports.forConnection,
         prepare: () async {
           await _initialization;
           await widget.profiles!.importDetected();
@@ -60,6 +64,7 @@ class _DashboardPageState extends State<DashboardPage> {
     await Future.wait<void>([
       if (widget.profiles != null) widget.profiles!.load(),
       if (_startup != null) _startup!.load(),
+      _ports.load(),
     ]);
     if (Platform.isWindows && widget.profiles != null) {
       final preferences = await SharedPreferences.getInstance();
@@ -91,6 +96,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<void> _disposeManagers() async {
     await _connection?.close();
     await _startup?.close();
+    await _ports.close();
     if (widget.engine != null) await widget.engine!.close();
     if (widget.xray != null) await widget.xray!.close();
     if (widget.profiles != null) await widget.profiles!.close();
@@ -149,7 +155,7 @@ class _DashboardPageState extends State<DashboardPage> {
             children: [
               _Header(onSelected: _openMenu),
               const SizedBox(height: 24),
-              _ConnectionCard(connection: _connection),
+              _ConnectionCard(connection: _connection, ports: _ports),
               if (widget.profiles != null &&
                   widget.engine != null &&
                   widget.xray != null)
@@ -309,8 +315,9 @@ class _SettingsDialog extends StatelessWidget {
 }
 
 class _ConnectionCard extends StatelessWidget {
-  const _ConnectionCard({this.connection});
+  const _ConnectionCard({this.connection, required this.ports});
   final ConnectionCubit? connection;
+  final ProxyPortsCubit ports;
 
   @override
   Widget build(BuildContext context) => connection == null
@@ -363,7 +370,7 @@ class _ConnectionCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '127.0.0.1:1080',
+                        '127.0.0.1',
                         style: TextStyle(color: colors.onSurfaceVariant),
                       ),
                     ],
@@ -407,6 +414,7 @@ class _ConnectionCard extends StatelessWidget {
                 ),
               ],
             ),
+            ProxyPortsView(cubit: ports, locked: state.active),
             if (state.message != null || running) ...[
               const SizedBox(height: 12),
               Text(

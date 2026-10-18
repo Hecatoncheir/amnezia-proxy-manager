@@ -29,6 +29,19 @@ void main() {
     sha256: 'unused',
     configuration: config,
   );
+  test('Выбранные порты передаются в IPC', () async {
+    final c = client();
+    addTearDown(c.close);
+    await c.start(
+      family: 'xray',
+      binary: 'unused',
+      sha256: 'unused',
+      configuration: 'custom_ports',
+      socksPort: 19080,
+      httpPort: 19081,
+    );
+    await c.stop();
+  });
   test(
     'IPC согласует протокол, получает события и повторно запускает сессию',
     () async {
