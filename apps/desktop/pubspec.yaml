@@ -1,15 +1,28 @@
 name: amnezia_proxy_manager
 description: 'Кроссплатформенный менеджер локального прокси AmneziaWG.'
 publish_to: none
-version: 0.1.0+1
+version: 0.1.1+2
 environment:
   sdk: ^3.13.5
 dependencies:
   flutter:
     sdk: flutter
+  flutter_bloc: ^9.1.1
+  crypto: ^3.0.6
+  http: ^1.5.0
+  path_provider: ^2.1.5
+  url_launcher: ^6.3.2
+  window_manager: 0.5.2
+  shared_preferences: ^2.5.6
+  screen_retriever: 0.2.2
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_driver:
+    sdk: flutter
 flutter:
   uses-material-design: true
+  assets:
+    - pubspec.yaml
+    - assets/branding/

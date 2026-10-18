@@ -1,23 +1,68 @@
 import 'package:amnezia_proxy_manager/main.dart';
+import 'package:amnezia_proxy_manager/settings/settings_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('Каркас не обещает соединение и переключает тему', (
+  test('Тема переключается через Cubit', () async {
+    final cubit = SettingsCubit();
+    expect(cubit.state, ThemeMode.dark);
+    cubit.toggleTheme();
+    expect(cubit.state, ThemeMode.light);
+    cubit.toggleTheme();
+    expect(cubit.state, ThemeMode.dark);
+    await cubit.close();
+  });
+
+  testWidgets('Настройки меняют тему, подключение не имитируется', (
     tester,
   ) async {
     await tester.pumpWidget(const ProxyManagerApp());
-    expect(find.text('Не подключено • каркас приложения'), findsOneWidget);
+    expect(find.text('Отключено'), findsOneWidget);
     expect(
       tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
       isNull,
     );
-    await tester.tap(find.byTooltip('Переключить тему'));
+    expect(find.text('— КБ/с'), findsNWidgets(2));
+    await tester.tap(find.byTooltip('Настройки'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(SwitchListTile));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Готово'));
     await tester.pumpAndSettle();
     expect(
       Theme.of(tester.element(find.byType(Scaffold))).brightness,
       Brightness.light,
     );
+    expect(find.text('ЛОКАЛЬНЫЙ ПРОКСИ'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Узкое окно и увеличенный текст не вызывают переполнения', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(440, 900);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpWidget(const ProxyManagerApp());
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Настройки помещаются в минимальное окно', (tester) async {
+    tester.view.physicalSize = const Size(380, 560);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpWidget(const ProxyManagerApp());
+    await tester.tap(find.byTooltip('Настройки'));
+    await tester.pumpAndSettle();
+    expect(find.text('Проверить обновления'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

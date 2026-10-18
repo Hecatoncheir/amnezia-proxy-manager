@@ -16,6 +16,7 @@ jobs:
         with:
           python-version: '3.13'
       - run: python -m unittest discover -s tools -p 'test_*.py'
+      - run: python -m unittest discover -s packaging -p 'test_*.py'
       - name: Проверка тега, версии и описания
         env:
           RELEASE_TAG: ${{ github.ref_name }}
@@ -86,6 +87,10 @@ jobs:
           Pop-Location
           Copy-Item Changelog.md $bundle
           Compress-Archive -Path "$bundle/*" -DestinationPath "dist/AmneziaProxyManager-$env:RELEASE_TAG-windows-x64.zip"
+          $version = $env:RELEASE_TAG.Substring(1)
+          $numeric = ($version -split '-')[0]
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" "/DAppNumericVersion=$numeric" packaging/windows.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Архив macOS
         if: runner.os == 'macOS'
         env:
@@ -94,8 +99,11 @@ jobs:
           mkdir -p dist
           bundle=apps/desktop/build/macos/Build/Products/Release
           (cd engine && go build -trimpath -o ../"$bundle"/proxy-engine ./cmd/proxy-engine)
+          cp "$bundle/proxy-engine" "$bundle/amnezia_proxy_manager.app/Contents/MacOS/"
+          codesign --force --deep --preserve-metadata=entitlements,requirements,flags --sign - "$bundle/amnezia_proxy_manager.app"
           cp Changelog.md "$bundle/"
           tar -czf "dist/AmneziaProxyManager-$RELEASE_TAG-macos-arm64.tar.gz" -C "$bundle" amnezia_proxy_manager.app proxy-engine Changelog.md
+          bash packaging/build-macos.sh
       - name: Архив Linux
         if: runner.os == 'Linux'
         env:
@@ -106,12 +114,26 @@ jobs:
           (cd engine && go build -trimpath -o ../"$bundle"/proxy-engine ./cmd/proxy-engine)
           cp Changelog.md "$bundle/"
           tar -czf "dist/AmneziaProxyManager-$RELEASE_TAG-linux-x64.tar.gz" -C "$bundle" .
+          bash packaging/build-linux.sh
       - uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.target }}
           path: dist/*
           if-no-files-found: error
           retention-days: 7
+      - name: Установка поверх предыдущей копии и перезапуск Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./packaging/check-windows-update.ps1
+      - name: Журналы установки Windows
+        if: always() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-update-logs
+          path: |
+            ${{ runner.temp }}/amnezia-update-check-*/*.log
+            ${{ runner.temp }}/amnezia-update-check-*/*.json
+          if-no-files-found: warn
   publish:
     needs: [validate, build]
     runs-on: ubuntu-24.04
@@ -129,8 +151,10 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           python3 tools/release.py notes "$RELEASE_TAG" --output release-notes.md
-          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 3
-          (cd dist && sha256sum -- *.zip *.tar.gz > SHA256SUMS.txt)
+          test -s dist/AmneziaProxyManager-Setup-windows-x64.exe
+          test -s dist/AmneziaProxyManager-macos-arm64.dmg
+          test -s dist/AmneziaProxyManager-linux-x64.run
+          (cd dist && sha256sum -- *.zip *.tar.gz *.exe *.dmg *.run > SHA256SUMS.txt)
       - name: Публикация
         env:
           GH_TOKEN: ${{ github.token }}

@@ -1,0 +1,113 @@
+import 'dart:async';
+import 'dart:math' as math;
+import 'dart:ui';
+
+import 'package:flutter/foundation.dart';
+import 'package:screen_retriever/screen_retriever.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:window_manager/window_manager.dart';
+
+import 'window_geometry.dart';
+
+class WindowPlacement with WindowListener {
+  WindowPlacement(
+    this.preferences,
+    this.normalBounds,
+    this.preferenceKey, [
+    this._maximized = false,
+  ]);
+  static const storageKey = 'window-placement-v1';
+  static WindowPlacement? _active;
+  static Future<void> flush() => _active?.save() ?? Future.value();
+  final SharedPreferences preferences;
+  final String preferenceKey;
+  Rect normalBounds;
+  bool _maximized;
+  Timer? _timer;
+  bool _closing = false;
+  Future<void> _writes = Future.value();
+
+  static Future<void> initialize({String preferenceKey = storageKey}) async {
+    await windowManager.ensureInitialized();
+    final preferences = await SharedPreferences.getInstance();
+    final saved = WindowGeometry.decode(preferences.getString(preferenceKey));
+    final displays = await screenRetriever.getAllDisplays();
+    final areas = displays
+        .map(
+          (display) =>
+              (display.visiblePosition ?? Offset.zero) &
+              (display.visibleSize ?? display.size),
+        )
+        .toList();
+    final bounds = fitWindowToDisplays(saved?.bounds, areas);
+    final placement = WindowPlacement(
+      preferences,
+      bounds,
+      preferenceKey,
+      saved?.maximized ?? false,
+    );
+    _active = placement;
+    await windowManager.waitUntilReadyToShow(
+      WindowOptions(
+        size: bounds.size,
+        minimumSize: Size(
+          math.min(380, bounds.width),
+          math.min(560, bounds.height),
+        ),
+        title: 'Amnezia Proxy',
+      ),
+    );
+    await windowManager.setBounds(bounds);
+    await windowManager.setPreventClose(true);
+    windowManager.addListener(placement);
+    if (saved?.maximized == true) await windowManager.maximize();
+    await windowManager.show();
+    await windowManager.focus();
+  }
+
+  void scheduleSave() {
+    _timer?.cancel();
+    _timer = Timer(const Duration(milliseconds: 250), () => unawaited(save()));
+  }
+
+  Future<void> save() {
+    _writes = _writes
+        .then((_) async {
+          final minimized = await windowManager.isMinimized();
+          final maximized = minimized
+              ? _maximized
+              : await windowManager.isMaximized();
+          _maximized = maximized;
+          if (!maximized && !minimized && !await windowManager.isFullScreen()) {
+            normalBounds = await windowManager.getBounds();
+          }
+          await preferences.setString(
+            preferenceKey,
+            WindowGeometry(normalBounds, maximized: maximized).encode(),
+          );
+        })
+        .catchError((Object error) {
+          debugPrint('Не удалось сохранить положение окна: $error');
+        });
+    return _writes;
+  }
+
+  @override
+  void onWindowMove() => scheduleSave();
+  @override
+  void onWindowResize() => scheduleSave();
+  @override
+  void onWindowMaximize() => scheduleSave();
+  @override
+  void onWindowUnmaximize() => scheduleSave();
+  @override
+  void onWindowClose() => unawaited(close());
+
+  Future<void> close() async {
+    if (_closing) return;
+    _closing = true;
+    _timer?.cancel();
+    await save();
+    await windowManager.destroy();
+  }
+}

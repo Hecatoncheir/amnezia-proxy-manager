@@ -18,6 +18,8 @@ Upstream реализует сетевой стек; supervisor отвечает
 
 ## Компоненты
 
+Текущий UI разделён на `main.dart`, `features/dashboard/dashboard_page.dart`, `settings/settings_cubit.dart` и `theme/gruvbox.dart`. Один `SettingsCubit<ThemeMode>` управляет темой; `BlocProvider` владеет его жизненным циклом. Простые карточки остаются обычными StatelessWidget, без искусственных событий и репозиториев. Данные сети пока не моделируются фиктивными состояниями.
+
 - Flutter presentation: темы, страницы, состояния. По мере реализации выделить features/profiles, features/connection, features/settings.
 - Dart engine client: планируемый запуск supervisor, JSON framing, таймауты и преобразование событий; бизнес-логика не в виджетах.
 - Go supervisor: планируемые IPC, machine state, безопасная передача профиля, управление дочерним процессом.
