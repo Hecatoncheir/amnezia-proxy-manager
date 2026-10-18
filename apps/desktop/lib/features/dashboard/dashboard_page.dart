@@ -3,9 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../settings/settings_cubit.dart';
 import '../updates/updates_view.dart';
+import '../engine/engine_manager.dart';
+import '../engine/engine_view.dart';
 
 class DashboardPage extends StatelessWidget {
-  const DashboardPage({super.key});
+  const DashboardPage({super.key, this.engine});
+  final EngineManager? engine;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -15,14 +18,18 @@ class DashboardPage extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 1120),
           child: ListView(
             padding: const EdgeInsets.all(28),
-            children: const [
-              _Header(),
-              SizedBox(height: 24),
-              _ConnectionCard(),
-              SizedBox(height: 16),
-              _ProfileCard(),
-              SizedBox(height: 16),
-              _TrafficCards(),
+            children: [
+              const _Header(),
+              const SizedBox(height: 24),
+              if (engine != null) ...[
+                EngineView(manager: engine!),
+                const SizedBox(height: 16),
+              ],
+              const _ConnectionCard(),
+              const SizedBox(height: 16),
+              const _ProfileCard(),
+              const SizedBox(height: 16),
+              const _TrafficCards(),
             ],
           ),
         ),

@@ -1,5 +1,28 @@
 # Проверки каркаса
 
+## Подготовка M1 и отдельного runtime — 18 октября 2026 года
+
+В рабочем коде после v0.1.1 подготовлены проверка GitHub-каталога backend при
+запуске, выбор совместимой версии, загрузка/проверка/активация runtime. Реальный
+каталог `synacker/amnezia-proxy` пуст: приложение показывает отсутствие совместимого
+выпуска. Через Flutter Driver проверено это состояние, hot reload успешен,
+ошибок Dart/Flutter нет.
+
+Локально: `flutter analyze`, 33 теста Flutter, Windows Release-сборка; Go tests/vet
+с настоящим `BACKEND_TEST_BINARY`, CLI `--inspect-backend` подтвердил хеш и ревизию.
+Upstream собран с CGO=0 под Windows amd64, Linux amd64 и Darwin arm64; тесты/vet
+исполнены только нативно на Windows. Снимок сборок: `backend/build-audit.json`.
+
+`tool/engine_install_probe.dart` проверил Windows-runtime настоящим upstream EXE:
+контролируемый HTTP-каталог → скачивание → SHA-256 → PE x64 → CLI `-h` →
+активация → повторная проверка. Результат `passed: true`, `status: ready`;
+это не загрузка опубликованного GitHub Release и не VPN-соединение.
+
+M1 не завершён: не подтверждены разрешение распространения upstream, реальный
+VPN-трафик и нативный запуск backend на macOS/Linux. Предлагаемый контракт
+`engine.json` ещё не согласован с upstream. Новый релиз приложения не создавался.
+Отчёт и дальнейшие шаги: [UPSTREAM.md](UPSTREAM.md), [ENGINE-RUNTIME.md](ENGINE-RUNTIME.md).
+
 ## Установщики, обновление и окно — 18 октября 2026 года
 
 В текущей рабочей копии добавлены Setup, DMG и RUN, проверка стабильных выпусков

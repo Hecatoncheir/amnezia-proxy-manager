@@ -4,19 +4,34 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/upstream"
+	"io"
 	"os"
+
+	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/upstream"
 )
 
 func main() {
-	if len(os.Args) != 2 || os.Args[1] != "--capabilities" {
-		fmt.Fprintln(os.Stderr, "Каркас движка: используйте --capabilities; запуск туннеля недоступен")
+	if err := run(os.Args[1:], os.Stdout); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
-	if err := json.NewEncoder(os.Stdout).Encode(map[string]any{
+}
+
+func run(args []string, output io.Writer) error {
+	if len(args) == 4 && args[0] == "--inspect-backend" && args[2] == "--sha256" {
+		if err := upstream.VerifyBinary(args[1], args[3]); err != nil {
+			return err
+		}
+		return json.NewEncoder(output).Encode(map[string]any{
+			"compatible": true, "upstreamRevision": upstream.Revision, "canStart": false,
+		})
+	}
+	if len(args) != 1 || args[0] != "--capabilities" {
+		return fmt.Errorf("используйте --capabilities или --inspect-backend PATH --sha256 HASH; запуск туннеля недоступен")
+	}
+	return json.NewEncoder(output).Encode(map[string]any{
 		"protocolVersion": 1, "status": "scaffold", "canStart": false,
 		"backend": "synacker/amnezia-proxy", "upstreamRevision": upstream.Revision,
-	}); err != nil {
-		os.Exit(1)
-	}
+		"backendDistribution": "separate", "backendCliContract": 1,
+	})
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'features/dashboard/dashboard_page.dart';
+import 'features/engine/engine_manager.dart';
 import 'settings/settings_cubit.dart';
 import 'settings/window_placement.dart';
 import 'theme/gruvbox.dart';
@@ -9,11 +10,12 @@ import 'theme/gruvbox.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await WindowPlacement.initialize();
-  runApp(const ProxyManagerApp());
+  runApp(ProxyManagerApp(engine: EngineManager()));
 }
 
 class ProxyManagerApp extends StatelessWidget {
-  const ProxyManagerApp({super.key});
+  const ProxyManagerApp({super.key, this.engine});
+  final EngineManager? engine;
 
   @override
   Widget build(BuildContext context) => BlocProvider(
@@ -28,7 +30,7 @@ class ProxyManagerApp extends StatelessWidget {
         themeAnimationDuration: MediaQuery.disableAnimationsOf(context)
             ? Duration.zero
             : const Duration(milliseconds: 240),
-        home: const DashboardPage(),
+        home: DashboardPage(engine: engine),
       ),
     ),
   );
