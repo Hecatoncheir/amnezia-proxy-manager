@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -138,18 +137,15 @@ class _ProfilesViewState extends State<ProfilesView> {
                     }
                   },
                   itemBuilder: (_) => [
-                    if (Platform.isWindows)
-                      const PopupMenuItem(
-                        value: 'local',
-                        child: ListTile(
-                          leading: Icon(Icons.move_to_inbox_outlined),
-                          title: Text('Из AmneziaVPN'),
-                          subtitle: Text(
-                            'Выбранный профиль на этом компьютере',
-                          ),
-                          contentPadding: EdgeInsets.zero,
-                        ),
+                    const PopupMenuItem(
+                      value: 'local',
+                      child: ListTile(
+                        leading: Icon(Icons.move_to_inbox_outlined),
+                        title: Text('Из AmneziaVPN'),
+                        subtitle: Text('Выбранный профиль на этом компьютере'),
+                        contentPadding: EdgeInsets.zero,
                       ),
+                    ),
                     const PopupMenuItem(
                       value: 'file',
                       child: ListTile(

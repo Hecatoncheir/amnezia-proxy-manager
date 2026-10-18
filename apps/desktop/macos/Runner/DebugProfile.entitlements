@@ -12,5 +12,7 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<key>com.apple.security.temporary-exception.shared-preference.read-only</key>
+	<array><string>org.amneziavpn.AmneziaVPN</string></array>
 </dict>
 </plist>

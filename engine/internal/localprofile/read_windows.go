@@ -1,13 +1,10 @@
 //go:build windows
 
-// Package localprofile читает выбранный профиль только по явному действию пользователя.
+// Package localprofile читает выбранный профиль текущего пользователя без изменения источника.
 package localprofile
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"strings"
 	"unicode/utf16"
@@ -27,6 +24,8 @@ type credential struct {
 	Attributes              uintptr
 	TargetAlias, UserName   *uint16
 }
+
+const Supported = true
 
 func secret(tag string) ([]byte, error) {
 	dll := windows.NewLazySystemDLL("advapi32.dll")
@@ -71,37 +70,6 @@ func registryBytes(raw []byte) ([]byte, error) {
 	return result, nil
 }
 
-func decrypt(raw, key, iv []byte) ([]byte, error) {
-	if !strings.HasPrefix(string(raw), "EncData") || len(key) != 32 || len(iv) != 32 {
-		return nil, errors.New("несовместимое хранилище")
-	}
-	data := append([]byte{}, raw[7:]...)
-	defer clear(data)
-	if len(data) == 0 || len(data)%16 != 0 {
-		return nil, errors.New("повреждённое хранилище")
-	}
-	block, _ := aes.NewCipher(key)
-	cipher.NewCBCDecrypter(block, iv[:16]).CryptBlocks(data, data)
-	padding := int(data[len(data)-1])
-	if padding < 1 || padding > 16 {
-		return nil, errors.New("повреждённое хранилище")
-	}
-	for _, b := range data[len(data)-padding:] {
-		if int(b) != padding {
-			return nil, errors.New("повреждённое хранилище")
-		}
-	}
-	data = data[:len(data)-padding]
-	if len(data) < 9 || binary.BigEndian.Uint32(data[:4]) != 12 {
-		return nil, errors.New("неподдерживаемый QVariant")
-	}
-	length := int(binary.BigEndian.Uint32(data[5:9]))
-	if length != len(data)-9 {
-		return nil, errors.New("некорректная длина QVariant")
-	}
-	return append([]byte{}, data[9:]...), nil
-}
-
 // ReadActive не обращается к API Premium, не создаёт конфигурации и не меняет AmneziaVPN.
 // В результат не включаются ключ подписки, auth_data или список других серверов.
 func ReadActive() ([]byte, error) {
@@ -138,35 +106,4 @@ func ReadActive() ([]byte, error) {
 		return nil, errors.New("не выбрано подключение AmneziaVPN")
 	}
 	return selected(data, id)
-}
-
-func selected(data []byte, id string) ([]byte, error) {
-	var servers []map[string]any
-	if json.Unmarshal(data, &servers) != nil || len(servers) > 100 {
-		return nil, errors.New("неверный список подключений")
-	}
-	for _, server := range servers {
-		if server["storageServerId"] != id {
-			continue
-		}
-		containers, ok := server["containers"].([]any)
-		if !ok {
-			break
-		}
-		for _, item := range containers {
-			container, ok := item.(map[string]any)
-			if !ok || container["container"] != server["defaultContainer"] {
-				continue
-			}
-			if xray, ok := container["xray"].(map[string]any); ok {
-				if config, ok := xray["last_config"].(string); ok && len(config) <= 65536 && json.Valid([]byte(config)) {
-					return []byte(config), nil
-				}
-			}
-			if _, ok := container["awg"].(map[string]any); ok {
-				return json.Marshal(map[string]any{"defaultContainer": "amnezia-awg", "dns1": server["dns1"], "dns2": server["dns2"], "hostName": server["hostName"], "containers": []any{container}})
-			}
-		}
-	}
-	return nil, errors.New("нет сохранённой клиентской конфигурации VLESS или AmneziaWG")
 }

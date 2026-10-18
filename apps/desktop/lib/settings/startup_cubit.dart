@@ -8,10 +8,11 @@ class StartupOptions {
   const StartupOptions({
     this.autostart = false,
     this.autoconnect = false,
+    this.startInTray = false,
     this.busy = false,
     this.message,
   });
-  final bool autostart, autoconnect, busy;
+  final bool autostart, autoconnect, startInTray, busy;
   final String? message;
 }
 
@@ -21,6 +22,13 @@ class StartupCubit extends Cubit<StartupOptions> {
   final Future<bool> Function(String)? autostartCommand;
   SharedPreferences? preferences;
   static const autoConnectKey = 'auto-connect-v1';
+  static const startInTrayKey = 'start-in-tray-v1';
+  static bool shouldStartInTray(
+    List<String> arguments,
+    SharedPreferences preferences,
+  ) =>
+      arguments.contains('--autostart') &&
+      (preferences.getBool(startInTrayKey) ?? false);
   bool _busy = false;
   Future<bool> _command(String action) async {
     if (autostartCommand != null) return autostartCommand!(action);
@@ -42,7 +50,8 @@ class StartupCubit extends Cubit<StartupOptions> {
     try {
       preferences ??= await SharedPreferences.getInstance();
       final autoconnect = preferences!.getBool(autoConnectKey) ?? false;
-      _publish(autoconnect: autoconnect, busy: true);
+      final startInTray = preferences!.getBool(startInTrayKey) ?? false;
+      _publish(autoconnect: autoconnect, startInTray: startInTray, busy: true);
       final enabled = await _command('status');
       _publish(autostart: enabled, autoconnect: autoconnect);
     } catch (_) {
@@ -50,6 +59,35 @@ class StartupCubit extends Cubit<StartupOptions> {
     } finally {
       _busy = false;
     }
+  }
+
+  Future<void> setStartInTray(bool enabled) async {
+    if (_busy) return;
+    _busy = true;
+    _publish(busy: true);
+    try {
+      await _writeStartInTray(enabled);
+      _publish(autostart: enabled ? true : null, startInTray: enabled);
+    } catch (_) {
+      _publish(
+        message: 'Не удалось настроить автозапуск в трей. Повторите попытку.',
+      );
+    } finally {
+      _busy = false;
+    }
+  }
+
+  Future<void> _writeStartInTray(bool enabled) async {
+    // Перерегистрируем старые записи без признака автозапуска.
+    if (enabled) await _enableAutostart();
+    preferences ??= await SharedPreferences.getInstance();
+    if (!await preferences!.setBool(startInTrayKey, enabled)) {
+      throw const FormatException();
+    }
+  }
+
+  Future<void> _enableAutostart() async {
+    if (!await _command('enable')) throw const FormatException();
   }
 
   Future<void> setAutostart(bool enabled) async {
@@ -89,6 +127,7 @@ class StartupCubit extends Cubit<StartupOptions> {
   void _publish({
     bool? autostart,
     bool? autoconnect,
+    bool? startInTray,
     bool busy = false,
     String? message,
   }) {
@@ -97,6 +136,7 @@ class StartupCubit extends Cubit<StartupOptions> {
         StartupOptions(
           autostart: autostart ?? state.autostart,
           autoconnect: autoconnect ?? state.autoconnect,
+          startInTray: startInTray ?? state.startInTray,
           busy: busy,
           message: message,
         ),

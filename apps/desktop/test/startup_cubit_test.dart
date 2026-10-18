@@ -4,6 +4,36 @@ import 'package:amnezia_proxy_manager/settings/startup_cubit.dart';
 
 void main() {
   test(
+    'Запуск в трей сохраняется, включает автозапуск и отличается от ярлыка',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final calls = <String>[];
+      final settings = StartupCubit(
+        autostartCommand: (action) async {
+          calls.add(action);
+          return action == 'enable';
+        },
+      );
+      await settings.load();
+      await settings.setStartInTray(true);
+      expect(settings.state.startInTray, true);
+      expect(settings.state.autostart, true);
+      expect(calls, ['status', 'enable']);
+      final preferences = await SharedPreferences.getInstance();
+      expect(
+        StartupCubit.shouldStartInTray(['--autostart'], preferences),
+        true,
+      );
+      expect(StartupCubit.shouldStartInTray([], preferences), false);
+      await settings.setStartInTray(false);
+      expect(
+        StartupCubit.shouldStartInTray(['--autostart'], preferences),
+        false,
+      );
+      await settings.close();
+    },
+  );
+  test(
     'Оба переключателя выключены по умолчанию; чтение не включает автозапуск',
     () async {
       SharedPreferences.setMockInitialValues({});

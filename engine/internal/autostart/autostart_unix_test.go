@@ -11,7 +11,7 @@ import (
 func TestRenderAutostart(t *testing.T) {
 	binary := "/tmp/Пример с пробелами/quote\"$%app"
 	linux := render(binary, "linux")
-	if !strings.Contains(linux, "%%") || !strings.Contains(linux, "Exec=\"") {
+	if !strings.Contains(linux, "%%") || !strings.Contains(linux, "Exec=\"") || !strings.Contains(linux, " --autostart\n") {
 		t.Fatal("не экранирована команда")
 	}
 	mac := render(binary, "darwin")
@@ -25,7 +25,7 @@ func TestRenderAutostart(t *testing.T) {
 			break
 		}
 	}
-	if !strings.Contains(mac, "<key>RunAtLoad</key>") {
+	if !strings.Contains(mac, "<key>RunAtLoad</key>") || !strings.Contains(mac, "<string>--autostart</string>") {
 		t.Fatal("нет запуска при входе")
 	}
 }

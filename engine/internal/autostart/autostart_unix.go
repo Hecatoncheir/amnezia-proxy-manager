@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-func render(binary, system string) string {
+func renderLegacy(binary, system string) string {
 	if system == "darwin" {
 		var escaped bytes.Buffer
 		xml.EscapeText(&escaped, []byte(binary))
@@ -21,6 +21,13 @@ func render(binary, system string) string {
 	escaped := strings.NewReplacer(`\`, `\\`, `"`, `\"`, "`", "\\`", `$`, `\$`, `%`, `%%`).Replace(binary)
 	command := strings.ReplaceAll(`"`+escaped+`"`, `\`, `\\`)
 	return "[Desktop Entry]\nType=Application\nName=Amnezia Proxy\nExec=" + command + "\nTerminal=false\n"
+}
+func render(binary, system string) string {
+	legacy := renderLegacy(binary, system)
+	if system == "darwin" {
+		return strings.Replace(legacy, "</array>", "<string>--autostart</string></array>", 1)
+	}
+	return strings.Replace(legacy, "\nTerminal=false", " --autostart\nTerminal=false", 1)
 }
 func apply(action, binary string) (bool, error) {
 	home, err := os.UserHomeDir()
@@ -76,5 +83,5 @@ func apply(action, binary string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return string(data) == expected, nil
+	return string(data) == expected || string(data) == renderLegacy(binary, runtime.GOOS), nil
 }

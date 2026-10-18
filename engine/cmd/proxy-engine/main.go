@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
 
 	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/autostart"
 	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/localprofile"
@@ -75,7 +74,7 @@ func run(args []string, output io.Writer) error {
 		"protocolVersion": 1, "status": "ready", "canStart": true,
 		"backend": "bropines/awg-wireproxy", "upstreamRevision": upstream.Revision,
 		"backendDistribution": "separate", "backendCliContract": 2,
-		"canValidateConfig": true, "canValidateXray": true, "canImportLocalAmnezia": runtime.GOOS == "windows",
+		"canValidateConfig": true, "canValidateXray": true, "canImportLocalAmnezia": localprofile.Supported,
 		"backends": []string{"bropines/awg-wireproxy", "XTLS/Xray-core"}, "xrayVersion": upstream.XrayVersion,
 	})
 }

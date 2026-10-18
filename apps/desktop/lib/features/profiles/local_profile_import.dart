@@ -4,13 +4,8 @@ import 'dart:io';
 import 'profile_codec.dart';
 
 Future<List<int>> readLocalAmneziaProfile() async {
-  if (!Platform.isWindows) {
-    throw const ProfileProblem(
-      'Локальный импорт пока доступен только в Windows.',
-    );
-  }
   final helper =
-      '${File(Platform.resolvedExecutable).parent.path}/proxy-engine.exe';
+      '${File(Platform.resolvedExecutable).parent.path}/${Platform.isWindows ? 'proxy-engine.exe' : 'proxy-engine'}';
   final process = await Process.start(helper, [
     '--import-amnezia',
   ], runInShell: false);
@@ -18,7 +13,7 @@ Future<List<int>> readLocalAmneziaProfile() async {
     final stderr = process.stderr.drain<void>();
     final bytes = <int>[];
     await for (final chunk in process.stdout.timeout(
-      const Duration(seconds: 10),
+      const Duration(seconds: 60),
     )) {
       if (bytes.length + chunk.length > maxProfileBytes) {
         throw const ProfileProblem('Профиль AmneziaVPN слишком большой.');

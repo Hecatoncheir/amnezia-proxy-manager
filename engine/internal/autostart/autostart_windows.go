@@ -11,7 +11,8 @@ const valueName = "AmneziaProxyManager"
 
 func apply(action, binary string) (bool, error) { return runKey(action, binary, runPath, valueName) }
 func runKey(action, binary, path, name string) (bool, error) {
-	command := `"` + binary + `"`
+	legacyCommand := `"` + binary + `"`
+	command := legacyCommand + ` --autostart`
 	if len(utf16.Encode([]rune(command))) > 260 {
 		return false, errors.New("слишком длинный путь автозапуска")
 	}
@@ -51,7 +52,7 @@ func runKey(action, binary, path, name string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	enabled := value == command
+	enabled := value == command || value == legacyCommand
 	if enabled && path == runPath {
 		approved, err := registry.OpenKey(registry.CURRENT_USER, `Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run`, registry.QUERY_VALUE)
 		if err == nil {

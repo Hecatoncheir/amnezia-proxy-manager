@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -66,7 +65,7 @@ class _DashboardPageState extends State<DashboardPage> {
       if (_startup != null) _startup!.load(),
       _ports.load(),
     ]);
-    if (Platform.isWindows && widget.profiles != null) {
+    if (widget.profiles != null) {
       final preferences = await SharedPreferences.getInstance();
       if (!(preferences.getBool('automatic-profile-discovery-v1') ?? false)) {
         await widget.profiles!.discoverLocal();
@@ -290,6 +289,15 @@ class _SettingsDialog extends StatelessWidget {
                       ),
                       value: state.autoconnect,
                       onChanged: state.busy ? null : startup!.setAutoconnect,
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Автозапуск свёрнутым в трей'),
+                      subtitle: const Text(
+                        'При входе в систему, без открытия окна',
+                      ),
+                      value: state.startInTray,
+                      onChanged: state.busy ? null : startup!.setStartInTray,
                     ),
                     if (state.message != null)
                       Text(

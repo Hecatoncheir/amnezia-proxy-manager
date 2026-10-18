@@ -17,6 +17,20 @@ class WindowPlacement with WindowListener {
     this._maximized = false,
   ]);
   static Future<void> Function()? beforeClose;
+  static Future<void> Function()? afterClose;
+  static Future<void> quit() async => _active?.close();
+  static Future<void> show() async {
+    if (await windowManager.isMinimized()) await windowManager.restore();
+    await windowManager.show();
+    if (_active?._maximized == true) await windowManager.maximize();
+    await windowManager.focus();
+  }
+
+  static Future<void> hide() async {
+    await flush();
+    await windowManager.hide();
+  }
+
   static const storageKey = 'window-placement-v1';
   static WindowPlacement? _active;
   static Future<void> flush() => _active?.save() ?? Future.value();
@@ -28,7 +42,10 @@ class WindowPlacement with WindowListener {
   bool _closing = false;
   Future<void> _writes = Future.value();
 
-  static Future<void> initialize({String preferenceKey = storageKey}) async {
+  static Future<void> initialize({
+    String preferenceKey = storageKey,
+    bool showWindow = true,
+  }) async {
     await windowManager.ensureInitialized();
     final preferences = await SharedPreferences.getInstance();
     final saved = WindowGeometry.decode(preferences.getString(preferenceKey));
@@ -61,9 +78,7 @@ class WindowPlacement with WindowListener {
     await windowManager.setBounds(bounds);
     await windowManager.setPreventClose(true);
     windowManager.addListener(placement);
-    if (saved?.maximized == true) await windowManager.maximize();
-    await windowManager.show();
-    await windowManager.focus();
+    if (showWindow) await show();
   }
 
   void scheduleSave() {
@@ -110,6 +125,7 @@ class WindowPlacement with WindowListener {
     _timer?.cancel();
     if (beforeClose != null) await beforeClose!();
     await save();
+    if (afterClose != null) await afterClose!();
     await windowManager.destroy();
   }
 }

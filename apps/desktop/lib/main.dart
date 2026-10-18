@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'features/dashboard/dashboard_page.dart';
 import 'features/engine/engine_manager.dart';
@@ -9,11 +10,19 @@ import 'features/profiles/profile_vault.dart';
 import 'features/profiles/profiles_cubit.dart';
 import 'settings/settings_cubit.dart';
 import 'settings/window_placement.dart';
+import 'settings/startup_cubit.dart';
+import 'settings/tray_cubit.dart';
 import 'theme/gruvbox.dart';
 
-Future<void> main() async {
+Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
-  await WindowPlacement.initialize();
+  final preferences = await SharedPreferences.getInstance();
+  await WindowPlacement.initialize(showWindow: false);
+  final tray = TrayCubit();
+  WindowPlacement.afterClose = tray.close;
+  await tray.start(
+    hidden: StartupCubit.shouldStartInTray(arguments, preferences),
+  );
   final engine = EngineManager();
   final xray = EngineManager(policy: xrayPolicy);
   final profiles = ProfilesCubit(
