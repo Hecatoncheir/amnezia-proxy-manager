@@ -36,7 +36,7 @@ class _EngineViewState extends State<EngineView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'ДВИЖОК AMNEZIAWG',
+              'ДВИЖОК AWG-WIREPROXY',
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),

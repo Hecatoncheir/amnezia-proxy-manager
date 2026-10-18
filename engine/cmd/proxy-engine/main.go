@@ -31,7 +31,7 @@ func run(args []string, output io.Writer) error {
 	}
 	return json.NewEncoder(output).Encode(map[string]any{
 		"protocolVersion": 1, "status": "scaffold", "canStart": false,
-		"backend": "synacker/amnezia-proxy", "upstreamRevision": upstream.Revision,
-		"backendDistribution": "separate", "backendCliContract": 1,
+		"backend": "bropines/awg-wireproxy", "upstreamRevision": upstream.Revision,
+		"backendDistribution": "separate", "backendCliContract": 2,
 	})
 }

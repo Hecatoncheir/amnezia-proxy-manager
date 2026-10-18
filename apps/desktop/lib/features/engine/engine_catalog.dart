@@ -1,6 +1,3 @@
-import 'dart:convert';
-
-import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 
 import '../updates/app_updates.dart' show AppVersion;
@@ -38,43 +35,14 @@ class EngineCatalog {
               .compareTo(AppVersion.parse(a['tag_name'])!),
     );
     for (final release in releases) {
-      final manifest = await _manifest(release);
-      if (manifest == null) continue;
       final candidate = EngineRelease.compatible(
         release,
-        manifest,
+        enginePolicy,
         applicationVersion: version,
         platform: platform,
       );
       if (candidate != null) return candidate;
     }
     return null;
-  }
-
-  Future<Map?> _manifest(Map release) async {
-    final assets = release['assets'];
-    if (assets is! List) return null;
-    final matches = assets
-        .whereType<Map>()
-        .where((asset) => asset['name'] == 'engine.json')
-        .toList();
-    if (matches.length != 1) return null;
-    final asset = EngineAsset.parse(
-      matches.single,
-      release['tag_name'],
-      'engine.json',
-    );
-    if (asset == null || asset.size > 16384) return null;
-    final bytes = await readGitHubBytes(client, asset.url, 16384);
-    if (bytes.length != asset.size ||
-        sha256.convert(bytes).toString() != asset.sha256) {
-      throw const FormatException('Манифест движка повреждён');
-    }
-    try {
-      final data = jsonDecode(utf8.decode(bytes));
-      return data is Map ? data : null;
-    } on FormatException {
-      return null;
-    }
   }
 }

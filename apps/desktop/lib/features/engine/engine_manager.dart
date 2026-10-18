@@ -103,8 +103,12 @@ class EngineManager extends Cubit<EngineState> {
       ),
     );
     File? partial;
+    RandomAccessFile? installationLock;
     try {
       await store.root.create(recursive: true);
+      installationLock = await File('${store.root.path}/install.lock')
+          .open(mode: FileMode.append);
+      await installationLock.lock(FileLock.exclusive);
       partial = File('${store.root.path}/${release.asset.sha256}.part');
       final response = await openGitHubAsset(client, release.asset.url);
       if (response.statusCode != 200) {
@@ -157,6 +161,7 @@ class EngineManager extends Cubit<EngineState> {
         // Незавершённый файл не активирован; его можно заменить при повторе.
       }
       _busy = false;
+      await installationLock?.close();
     }
   }
 

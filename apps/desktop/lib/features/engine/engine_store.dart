@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:archive/archive.dart';
 
 import 'engine_release.dart';
 
@@ -13,7 +14,7 @@ class EngineStore {
   final Future<void> Function(File, String) probe;
 
   File executable(EngineRelease release) => File(
-    '${root.path}/runtimes/${release.asset.sha256}/${release.asset.name}',
+    '${root.path}/runtimes/${release.asset.sha256}/${release.binaryName}',
   );
 
   Future<bool> valid(File file, EngineAsset asset) async {
@@ -37,7 +38,8 @@ class EngineStore {
         applicationVersion: applicationVersion,
         platform: platform,
       );
-      if (release == null || !await valid(executable(release), release.asset)) {
+      if (release == null ||
+          !await valid(executable(release), release.binary)) {
         return null;
       }
       await probe(executable(release), platform);
@@ -55,6 +57,48 @@ class EngineStore {
     if (!await valid(partial, release.asset)) {
       throw const FormatException('SHA-256 движка не совпадает');
     }
+    final bytes = await partial.readAsBytes();
+    final unpacked = release.asset.name.endsWith('.zip')
+        ? ZipDecoder().decodeBytes(bytes)
+        : TarDecoder().decodeBytes(await _gunzip(bytes));
+    final matches = unpacked.files
+        .where((entry) => entry.name == release.binaryName)
+        .toList();
+    final licenses = unpacked.files
+        .where((entry) => entry.name == 'LICENSE')
+        .toList();
+    if (matches.length != 1 ||
+        !matches.single.isFile ||
+        matches.single.isSymbolicLink ||
+        matches.single.size != release.binary.size ||
+        licenses.length != 1 ||
+        !licenses.single.isFile ||
+        licenses.single.size > 65536) {
+      throw const FormatException('Неверное содержимое архива движка');
+    }
+    final extracted = File('${partial.path}.exe');
+    try {
+      await extracted.writeAsBytes(matches.single.content, flush: true);
+      if (!await valid(extracted, release.binary)) {
+        throw const FormatException('SHA-256 исполняемого файла не совпадает');
+      }
+      return await _activateExecutable(
+        extracted,
+        release,
+        platform,
+        licenses.single.content,
+      );
+    } finally {
+      if (await extracted.exists()) await extracted.delete();
+    }
+  }
+
+  Future<File> _activateExecutable(
+    File partial,
+    EngineRelease release,
+    String platform,
+    List<int> license,
+  ) async {
     if (!Platform.isWindows) {
       final result = await Process.run('/bin/chmod', ['700', partial.path]);
       if (result.exitCode != 0) {
@@ -65,6 +109,8 @@ class EngineStore {
     final target = executable(release);
     await target.parent.create(recursive: true);
     await partial.rename(target.path);
+    await File('${target.parent.path}/LICENSE')
+        .writeAsBytes(license, flush: true);
     final active = File('${root.path}/active.json');
     if (await active.exists()) await active.copy('${root.path}/previous.json');
     final pending = File('${root.path}/active.json.pending');
@@ -78,7 +124,12 @@ Future<void> verifyEngineExecutable(File file, String platform) async {
   if (!await engineArchitectureMatches(file, platform)) {
     throw const FormatException('Неверная архитектура движка');
   }
-  final process = await Process.start(file.path, ['-h'], runInShell: false);
+  final process = await Process.start(
+    file.path,
+    ['--help'],
+    runInShell: false,
+    environment: {'WIREPROXY_ADMIN': '', 'WIREPROXY_ADMIN_TOKEN': ''},
+  );
   try {
     final output = await Future.wait([
       _boundedOutput(process.stdout),
@@ -88,13 +139,15 @@ Future<void> verifyEngineExecutable(File file, String platform) async {
       throw const FormatException('Движок не поддерживает проверку CLI');
     }
     final help = output.join('\n');
-    if (![
-      '-config ',
-      '-socks-listen ',
-      '-http-listen ',
-      '-dial-timeout ',
-    ].every(help.contains)) {
+    if (!['--config ', '--configtest', '--version'].every(help.contains)) {
       throw const FormatException('Несовместимый CLI движка');
+    }
+    final version = await Process.run(file.path, [
+      '--version',
+    ], runInShell: false).timeout(const Duration(seconds: 10));
+    if (version.exitCode != 0 ||
+        version.stdout.toString().trim() != 'wireproxy, version 2.1.0') {
+      throw const FormatException('Несовместимая версия движка');
     }
   } finally {
     process.kill();
@@ -145,4 +198,15 @@ Future<bool> _windowsHeader(RandomAccessFile file, ByteData header) async {
   final pe = ByteData.sublistView(bytes);
   return pe.getUint32(0) == 0x50450000 &&
       pe.getUint16(4, Endian.little) == 0x8664;
+}
+
+Future<List<int>> _gunzip(List<int> bytes) async {
+  final result = <int>[];
+  await for (final chunk in gzip.decoder.bind(Stream.value(bytes))) {
+    if (result.length + chunk.length > 32 * 1024 * 1024) {
+      throw const FormatException('Архив движка слишком большой');
+    }
+    result.addAll(chunk);
+  }
+  return result;
 }

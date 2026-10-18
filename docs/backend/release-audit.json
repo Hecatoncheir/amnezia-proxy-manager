@@ -1,0 +1,37 @@
+{
+  "repository": "bropines/awg-wireproxy",
+  "tag": "v2.1.0",
+  "revision": "02588433b6328171b594d76f3f16bd3404258a83",
+  "checkedAt": "2026-10-18",
+  "checksumsFileSHA256": "abafaf3c6c05630889589db818a7d99b8ed830cef031f7d9af46ca2c9cb40e64",
+  "packages": {
+    "awg-wireproxy_2.1.0_darwin_arm64.tar.gz": {
+      "archiveSHA256": "583f0c1d73e2510c8ca1c3200b27131d1a54f1019e036509760202da89aa5bce",
+      "binarySHA256": "8fa5940404a06c5b1e6f51cfb4ae59c88afcdc3a9da980dc57b6a3575494bb29",
+      "binarySize": 10782610
+    },
+    "awg-wireproxy_2.1.0_linux_amd64.tar.gz": {
+      "archiveSHA256": "aa05dbc67198b56417334e4aa8bfca73cd23ba946eb70e1c7205b2319d618311",
+      "binarySHA256": "619f3e7b4aa6e9f6af38a826f30578d0e2eca9f932e93f518220884e9b7e10a6",
+      "binarySize": 11370656
+    },
+    "awg-wireproxy_2.1.0_windows_amd64.zip": {
+      "archiveSHA256": "6d86151aea7befce55ebb2a1b74e0ccaf553c4ae44f224a4e4ceb0c8362ebd40",
+      "binarySHA256": "c5890fedddc63a97ad123e2d490edbf5fd2a0edfccbc7db99b1c53c72efcb2f3",
+      "binarySize": 11687936
+    }
+  },
+  "windowsSmoke": {
+    "realVpn": false,
+    "configtest": true,
+    "invalidConfigRejected": true,
+    "socksHandshake": true,
+    "httpListener": true,
+    "stopped": true
+  },
+  "limitations": [
+    "External VPN and DNS not tested",
+    "Linux/macOS execution not tested",
+    "Upstream admin permission test fails on Windows"
+  ]
+}

@@ -1,101 +1,69 @@
-# Интеграция upstream — M1, 18 октября 2026 года
+# Проверка upstream — 18 октября 2026
 
-Источник: [synacker/amnezia-proxy](https://github.com/synacker/amnezia-proxy).
-Проверенная ревизия: `f5a7912dba8b128ae5c1a3f68a06be7c1668b908` — текущий main
-на момент проверки. Исходники клонированы в игнорируемый `work/upstream-amnezia-proxy`,
-не изменялись и не включены в исходники нашего приложения.
+Выбран [bropines/awg-wireproxy](https://github.com/bropines/awg-wireproxy),
+[v2.1.0](https://github.com/bropines/awg-wireproxy/releases/tag/v2.1.0),
+ревизия `02588433b6328171b594d76f3f16bd3404258a83`.
+Ранее исследовавшийся synacker/amnezia-proxy заменён; его отсутствие лицензии
+больше не блокирует выбранный движок. Результаты прежнего исследования сохранены в Git.
 
-## Лицензия и возможность поставки
+## Лицензия
 
-GitHub API возвращает `license: null`. В дереве проверенной ревизии нет файлов
-LICENSE/COPYING/NOTICE; в README не найдено явного разрешения на распространение.
-Поэтому правовое основание нашей публикации backend **не подтверждено**.
-Локальные сборки для исследования остаются в игнорируемом `build/backend/`;
-не создавались fork, issue, PR или релиз с чужими бинарниками.
+В проверенной ревизии есть [ISC LICENSE](https://github.com/bropines/awg-wireproxy/blob/v2.1.0/LICENSE):
+разрешены использование, изменение и распространение с сохранением copyright и
+текста лицензии. Неизменённая копия: `backend/AWG-WIREPROXY-LICENSE.txt`.
+В установках движка LICENSE сохраняется рядом с бинарником. Архивы скачиваются
+напрямую из релизов автора, собственные сборки не публикуются.
 
-Это согласуется с [пояснением GitHub о репозиториях без лицензии](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository).
-Проверка не заменяет разрешения автора. Собственная лицензия проекта также ещё
-не выбрана владельцем.
+Опись модулей в `backend/build-audit.json`: ISC у проекта, MIT у amneziawg-go/v3,
+argparse, heredoc, go-socks5, landlock и Go-обёртки wintun; Apache-2.0 у gvisor,
+btree и go-ini; BSD у Go x/* и protect. У libcap/psx двойная лицензия
+BSD-3-Clause OR GPL-2.0-only (модуль входит в Linux-зависимости).
+Это инвентаризация корневых лицензий модулей, не окончательный файловый аудит.
+NOTICE/SBOM и условия зависимостей требуют завершения перед нашей перепубликацией.
 
-Опись реально используемых Go-модулей по трём сборкам:
+## Сборка и пакеты
 
-| Модуль | Версия | Файл лицензии уровня модуля |
-| --- | --- | --- |
-| amnezia-proxy | указанная ревизия | Отсутствует |
-| github.com/amnezia-vpn/amneziawg-go/v3 | v3.1.20260828 | MIT |
-| golang.zx2c4.com/wintun | v0.0.0-20230126152724-0fa3db229ce2 | MIT (Go-обёртка) |
-| github.com/google/btree | v1.1.3 | Apache-2.0 |
-| gvisor.dev/gvisor | v0.0.0-20231202080848-1f7806d17489 | Apache-2.0 |
-| golang.org/x/crypto | v0.42.0 | BSD-3-Clause |
-| golang.org/x/net | v0.44.0 | BSD-3-Clause |
-| golang.org/x/sys | v0.36.0 | BSD-3-Clause |
-| golang.org/x/time | v0.9.0 | BSD-3-Clause |
+Исходники без изменений: игнорируемый `work/upstream-awg-wireproxy`.
+Go 1.27.1 выбран автоматически по go.mod; локальные сборки CGO=0:
+Windows amd64, Linux amd64 и Darwin arm64. На Windows проверен локальный CLI;
+две другие сборки — только кросс-компиляция. Отчёт `backend/build-audit.json`.
 
-Тексты и SHA-256 файлов LICENSE просмотрены локально; версии/Go sums/хеши лицензий
-записаны в [описи сборки](backend/build-audit.json). Это начальная опись модулей,
-**не окончательный NOTICE или SBOM**: отдельные файлы и компоненты могут иметь
-дополнительные условия. Отдельный драйвер Wintun DLL не скачивался и не поставлялся.
-Лицензии зависимостей не лицензируют автоматически код самого amnezia-proxy.
+Отдельно скачаны настоящие релизные архивы трёх платформ. SHA-256 сверены с GitHub
+API и `checksums.txt`; вычислены отдельные хеши бинарников, проверены содержимое
+и архитектуры. Эти релизные хеши закреплены в приложении; локальные сборки
+имеют другие хеши и не подменяют опубликованные пакеты. Снимок: `backend/release-audit.json`.
 
-## Сборка и фактические проверки
+## Исполненные проверки
 
-Go 1.27.0, `CGO_ENABLED=0`, `go build -trimpath`; версия в upstream go.mod — 1.25.0.
-Воспроизведение из корня проекта:
+- Windows release: `--help`, `--version` = 2.1.0, Go build info с точной ревизией,
+  `vcs.modified=false` и windows/amd64.
+- `--configtest`: корректный синтетический профиль принимается, неверный ключ
+  отклоняется; путь содержит кириллицу и пробелы.
+- Реальный Windows subprocess: SOCKS5 negotiation, TCP listener HTTP, остановка
+  и освобождение обоих портов. Endpoint — loopback без сервера: внешний VPN этим не проверяется.
+- Upstream `go test -count=1 -v .`: успешны локальные туннели WireGuard, AWG 1 и
+  AWG 3, SOCKS5-запрос через туннель, тесты конфигурации и HTTP.
+- `go vet ./...`: успешно. Полный `go test ./...` не зелёный: в пакете `admin`
+  `TestConfigMaskedAndSaved` ожидает Unix-права, Windows сообщает `-rw-rw-rw-`.
+  Веб-панель в нашем адаптере не включается. Это зафиксированное ограничение,
+  а не исправленный тест upstream.
+- Загрузчик UI испытан с настоящими GitHub API/ZIP, затем без сети.
+
+Заявленные upstream параметры AWG 1/1.5/2/3.x изучены; локальные tunnel-тесты
+не подтверждают все версии и экспорты AmneziaVPN. Не проверены внешний endpoint,
+DNS/IPv6, UDP ASSOCIATE, реальные профили и запуск на macOS/Linux.
+
+## Воспроизведение
 
 ```powershell
-git clone https://github.com/synacker/amnezia-proxy.git work/upstream-amnezia-proxy
-git -C work/upstream-amnezia-proxy checkout f5a7912dba8b128ae5c1a3f68a06be7c1668b908
+git clone --depth 1 --branch v2.1.0 https://github.com/bropines/awg-wireproxy.git work/upstream-awg-wireproxy
 python tools/audit_backend.py
+gh release download v2.1.0 --repo bropines/awg-wireproxy --pattern '*windows_amd64.zip' --dir build/awg-wireproxy-v2.1.0
+# Извлечь wireproxy.exe из скачанного архива в тот же каталог.
+python tools/check_awg_backend.py build/awg-wireproxy-v2.1.0/wireproxy.exe --output build/awg-wireproxy-v2.1.0/smoke.json
 ```
 
-Скрипт отклоняет другую ревизию или изменённое дерево. Создаются:
-
-- `build/backend/awg-proxy-windows-amd64.exe` — Windows PE x64.
-- `build/backend/awg-proxy-linux-amd64` — ELF x64, только кросс-компиляция.
-- `build/backend/awg-proxy-darwin-arm64` — Mach-O arm64, только кросс-компиляция.
-- `build/backend/audit.json` — контрольные суммы и модульная опись.
-
-На Windows прошли `go test -count=1 ./...`, `go vet ./...`, `-h` и проверка
-`go version -m`: правильная ревизия, `vcs.modified=false`, GOOS/GOARCH, CGO=0.
-Наш `upstream.VerifyBinary` проверен на настоящем собранном бинарнике:
-
-```powershell
-$env:BACKEND_TEST_BINARY = (Resolve-Path build/backend/awg-proxy-windows-amd64.exe).Path
-cd engine
-go test ./...
-```
-
-Upstream-тесты HTTP и CONNECT используют локальный сервер и прямой тестовый dial,
-а не действующий AmneziaWG-сервер. Они подтверждают обработчики прокси, но не VPN,
-DNS, IPv6, SOCKS5 через реальный туннель или отсутствие утечек.
-
-## Совместимость и обнаруженные ограничения
-
-CLI подтверждён: `-config`, `-socks-listen`, `-http-listen`, `-dial-timeout`,
-`-verbose`. Нет `--version`, `--capabilities`, JSON IPC или передачи конфигурации
-через stdin. Исходный CLI требует путь к файлу; секреты нельзя помещать в аргументы.
-Для версии используются манифест релиза и встроенные Go build info.
-
-По исходникам поддерживаются wg-quick INI и `vpn://` (qCompress/zlib/JSON с AWG).
-Это пока не подтверждение совместимости с реальным экспортом пользователя.
-`vpn.go` читает файл и распакованный JSON без явного общего ограничения размера:
-до запуска backend нужен ограниченный разбор в M2. `PostUp`/`PostDown` не выполняются
-как команды, но неизвестные поля INI не отклоняются; UI должен иметь свой allowlist.
-Сообщение о listener печатается до фактического bind — лог не является признаком
-готовности. Прямой stderr может содержать приватный путь/значение ошибки и не должен
-показываться в UI без очистки. На Windows пока не подтверждены управляемая остановка
-SIGTERM и завершение дерева; для этого нужен supervisor/Job Object в M3.
-
-В upstream на момент проверки нет тегов и GitHub Releases, только Linux-артефакт
-workflow автора. CI-артефакт не используется как замена стабильному выпуску.
-Приложение подготавливает отдельную загрузку по [контракту runtime](ENGINE-RUNTIME.md),
-но до согласованной публикации оно корректно сообщает об отсутствии совместимого
-движка. Включение backend в наш установщик не требуется.
-
-## Что осталось для выхода из M1
-
-1. Явная лицензия/разрешение автора и согласованные релизы с бинарниками/манифестом.
-2. Нативный запуск macOS/Linux, sandbox и подписи; окончательная опись лицензий.
-3. Настоящий тестовый сервер/отдельный профиль для SOCKS5, HTTP, DNS, IPv4/IPv6,
-   неверного ключа, недоступного endpoint и поведения без прямого fallback.
-4. После этого M2–M3: безопасный импорт, хранение ключей и жизненный цикл туннеля.
+Веб-панель может включаться через `WIREPROXY_ADMIN`; адаптер удаляет все
+`WIREPROXY_*` из окружения. В M2 разрешать только необходимые поля AWG-профиля:
+маршрутные whitelist-правила upstream могут использовать прямой доступ и не
+должны попадать в сгенерированный конфиг. Health без CheckAlive не доказывает VPN.

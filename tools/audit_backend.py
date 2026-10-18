@@ -7,7 +7,7 @@ from pathlib import Path
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-REVISION = "f5a7912dba8b128ae5c1a3f68a06be7c1668b908"
+REVISION = "02588433b6328171b594d76f3f16bd3404258a83"
 TARGETS = [("windows", "amd64"), ("linux", "amd64"), ("darwin", "arm64")]
 
 
@@ -38,8 +38,8 @@ def module_licenses(module, source):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", type=Path, default=ROOT / "work/upstream-amnezia-proxy")
-    parser.add_argument("--output", type=Path, default=ROOT / "build/backend")
+    parser.add_argument("--source", type=Path, default=ROOT / "work/upstream-awg-wireproxy")
+    parser.add_argument("--output", type=Path, default=ROOT / "build/awg-wireproxy-source")
     args = parser.parse_args()
     source, output = args.source.resolve(), args.output.resolve()
     if run(["git", "rev-parse", "HEAD"], source).strip() != REVISION:
@@ -49,26 +49,30 @@ def main():
     output.mkdir(parents=True, exist_ok=True)
     host = (run(["go", "env", "GOHOSTOS"], source).strip(),
             run(["go", "env", "GOHOSTARCH"], source).strip())
-    report = {"repository": "synacker/amnezia-proxy", "revision": REVISION,
+    report = {"repository": "bropines/awg-wireproxy", "revision": REVISION,
               "goVersion": run(["go", "version"], source).strip(),
-              "distributionApproved": False, "builds": [], "modules": {}}
-    report["tests"] = run(["go", "test", "-count=1", "./..."], source).strip()
+              "upstreamLicense": "ISC", "distributionApproved": False, "builds": [], "modules": {}}
+    try:
+        report["tests"] = run(["go", "test", "-count=1", "./..."], source).strip()
+    except subprocess.CalledProcessError as error:
+        report["tests"] = {"exitCode": error.returncode, "output": error.output}
+    report["coreTests"] = run(["go", "test", "-count=1", "-v", "."], source).strip()
     report["vet"] = run(["go", "vet", "./..."], source).strip() or "ok"
     for system, architecture in TARGETS:
         environment = dict(os.environ, GOOS=system, GOARCH=architecture, CGO_ENABLED="0")
-        name = f"awg-proxy-{system}-{architecture}" + (".exe" if system == "windows" else "")
+        name = f"wireproxy-{system}-{architecture}" + (".exe" if system == "windows" else "")
         target = output / name
-        run(["go", "build", "-trimpath", "-o", str(target), "."], source, environment)
+        run(["go", "build", "-trimpath", "-o", str(target), "./cmd/wireproxy"], source, environment)
         native = (system, architecture) == host
         if native:
             help_text = run([str(target), "-h"], source)
-            if not all(flag in help_text for flag in ["-config", "-socks-listen", "-http-listen", "-dial-timeout"]):
+            if not all(flag in help_text for flag in ["--config", "--configtest", "--version"]):
                 raise ValueError("CLI upstream не соответствует контракту")
         data = target.read_bytes()
         report["builds"].append({"file": name, "os": system, "arch": architecture,
                                  "size": len(data), "sha256": hashlib.sha256(data).hexdigest(),
                                  "validation": "native CLI/test" if native else "cross-compile only"})
-        packages = objects(run(["go", "list", "-deps", "-json", "."], source, environment))
+        packages = objects(run(["go", "list", "-deps", "-json", "./cmd/wireproxy"], source, environment))
         for package in packages:
             module = package.get("Module")
             if module is None or module["Path"] in report["modules"]:

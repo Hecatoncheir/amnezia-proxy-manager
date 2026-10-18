@@ -5,221 +5,224 @@ import 'package:amnezia_proxy_manager/features/engine/engine_catalog.dart';
 import 'package:amnezia_proxy_manager/features/engine/engine_manager.dart';
 import 'package:amnezia_proxy_manager/features/engine/engine_release.dart';
 import 'package:amnezia_proxy_manager/features/engine/engine_store.dart';
+import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
-Map<String, Object> manifest() => {
-  'schemaVersion': 1,
-  'cliContract': 1,
-  'sourceRevision': engineSourceRevision,
-  'minAppVersion': '0.1.1',
-  'maxAppVersionExclusive': '0.2.0',
-  'assets': engineAssetNames,
+Map<String, dynamic> release({String tag = engineTag}) => {
+  'tag_name': tag,
+  'draft': false,
+  'prerelease': false,
+  'assets': [
+    for (final platform in engineAssetNames.keys)
+      {
+        'name': engineAssetNames[platform],
+        'size': 4690621,
+        'digest':
+            'sha256:${enginePolicy['packages'][platform]['archiveSHA256']}',
+        'browser_download_url':
+            'https://github.com/$engineRepository/releases/download/$tag/${engineAssetNames[platform]}',
+      },
+  ],
 };
 
-Map<String, Object> release(String tag, List<int> binary, {Map? contract}) {
-  final description = utf8.encode(jsonEncode(contract ?? manifest()));
-  Map asset(String name, List<int> bytes) => {
-    'name': name,
-    'size': bytes.length,
-    'digest': 'sha256:${sha256.convert(bytes)}',
-    'browser_download_url':
-        'https://github.com/$engineRepository/releases/download/$tag/$name',
-  };
-  return {
-    'tag_name': tag,
-    'draft': false,
-    'prerelease': false,
-    'assets': [
-      asset('engine.json', description),
-      asset(engineAssetNames['windows-x64']!, binary),
-    ],
-  };
-}
-
 void main() {
-  late Directory temporary;
-  final binary = utf8.encode('тестовый пакет движка');
+  late Directory root;
   setUp(
-    () async => temporary = await Directory.systemTemp.createTemp(
-      'amnezia-engine-test-',
-    ),
+    () async => root = await Directory.systemTemp.createTemp('awg проверка '),
   );
-  tearDown(() async {
-    assert(
-      temporary.absolute.parent.path == Directory.systemTemp.absolute.path,
-    );
-    await temporary.delete(recursive: true);
-  });
-
-  http.Client client(List<Map> releases, {List<int>? received}) =>
-      MockClient((request) async {
-        if (request.url.host == 'api.github.com') {
-          return http.Response(jsonEncode(releases), 200);
-        }
-        if (request.url.path.endsWith('engine.json')) {
-          return http.Response(jsonEncode(manifest()), 200);
-        }
-        return http.Response.bytes(received ?? binary, 200);
-      });
-
-  EngineManager manager(http.Client client, {bool rejectProbe = false}) =>
-      EngineManager(
-        client: client,
-        platform: 'windows-x64',
-        readVersion: () async => '0.1.1+2',
-        directory: () async => temporary,
-        probe: (_, _) async {
-          if (rejectProbe) throw const FormatException('Неверная архитектура');
-        },
-      );
-
-  test('Ошибка обновления сохраняет активный движок', () async {
-    final initial = manager(client([release('v1.0.0', binary)]));
-    await initial.check();
-    await initial.download();
-    await initial.close();
-    final pointer = await File('${temporary.path}/active.json').readAsString();
-    final update = manager(
-      client([
-        release('v1.1.0', [...binary, 1]),
-      ], received: List.filled(binary.length + 1, 0)),
-    );
-    addTearDown(update.close);
-    await update.check();
-    expect(update.state.status, EngineStatus.available);
-    await update.download();
-    expect(update.state.status, EngineStatus.failed);
-    expect(update.state.installed!.tag, 'v1.0.0');
-    expect(await File('${temporary.path}/active.json').readAsString(), pointer);
-  });
-
-  test(
-    'Чужое перенаправление отклоняется до запроса к чужому серверу',
-    () async {
-      var calls = 0;
-      final engine = manager(
-        MockClient((_) async {
-          calls++;
-          return http.Response(
-            '',
-            302,
-            headers: {'location': 'https://example.org/releases'},
-          );
-        }),
-      );
-      addTearDown(engine.close);
-      await engine.check();
-      expect(engine.state.status, EngineStatus.failed);
-      expect(calls, 1);
-    },
+  tearDown(() async => root.delete(recursive: true));
+  EngineManager manager(http.Client client) => EngineManager(
+    client: client,
+    platform: 'windows-x64',
+    readVersion: () async => '0.1.1',
+    directory: () async => root,
   );
 
-  test('Нет релизов — нет ложного состояния готовности', () async {
-    final engine = manager(client([]));
-    addTearDown(engine.close);
-    await engine.check();
-    expect(engine.state.status, EngineStatus.unavailable);
-  });
-
-  test(
-    'Новейший совместимый выпуск выбирается по версии, не порядку API',
-    () async {
-      final connection = client([
-        release('v1.0.0', binary),
-        release('v1.2.0', binary),
-        release('v1.1.0', binary),
-      ]);
-      addTearDown(connection.close);
-      expect(
-        (await EngineCatalog(
-          connection,
-        ).latestCompatible('0.1.1', 'windows-x64'))!.tag,
-        'v1.2.0',
+  test('Выбирается проверенная версия, будущие выпуски пропускаются', () async {
+    var calls = 0;
+    final client = MockClient((request) async {
+      calls++;
+      expect(request.url.path, '/repos/bropines/awg-wireproxy/releases');
+      return http.Response(
+        jsonEncode([release(tag: 'v3.0.0'), release()]),
+        200,
       );
-    },
-  );
-
-  test('Скачивание, проверка, активация и повторный запуск без сети', () async {
-    final engine = manager(client([release('v1.0.0', binary)]));
-    await engine.check();
-    expect(engine.state.status, EngineStatus.available);
-    await engine.download();
-    expect(engine.state.status, EngineStatus.ready);
-    expect(await File('${temporary.path}/active.json').exists(), true);
-    await engine.close();
-    final offline = manager(
-      MockClient((_) async => http.Response('offline', 503)),
-    );
-    addTearDown(offline.close);
-    await offline.check();
-    expect(offline.state.status, EngineStatus.ready);
-    expect(offline.state.offline, true);
+    });
+    addTearDown(client.close);
+    final result = await EngineCatalog(client)
+        .latestCompatible('0.1.1', 'windows-x64');
+    expect(result!.tag, engineTag);
+    expect(result.binaryName, 'wireproxy.exe');
+    expect(calls, 1);
   });
 
-  test('Подмена и несовместимый CLI не активируют пакет', () async {
-    for (final rejectProbe in [false, true]) {
-      final engine = manager(
-        client([
-          release('v1.0.0', binary),
-        ], received: rejectProbe ? binary : List.filled(binary.length, 0)),
-        rejectProbe: rejectProbe,
-      );
-      await engine.check();
-      await engine.download();
-      expect(engine.state.status, EngineStatus.failed);
-      expect(await File('${temporary.path}/active.json').exists(), false);
-      await engine.close();
-    }
-  });
-
-  test('Неизвестная ревизия, контракт, диапазон и чужой URL отвергаются', () {
-    final metadata = release('v1.0.0', binary);
-    for (final contract in [
-      manifest()..['cliContract'] = 2,
-      manifest()..['sourceRevision'] = '0' * 40,
-      manifest()..['minAppVersion'] = '0.2.0',
-      manifest()..['maxAppVersionExclusive'] = '0.1.1',
-    ]) {
+  test('Подмена хеша, URL, draft и неверная платформа отклоняются', () {
+    final cases = [
+      release()..['draft'] = true,
+      release()..['prerelease'] = true,
+    ];
+    final hash = release();
+    (hash['assets'] as List).first['digest'] = 'sha256:${'0' * 64}';
+    cases.add(hash);
+    final url = release();
+    (url['assets'] as List).first['browser_download_url'] =
+        'https://example.org/engine.zip';
+    cases.add(url);
+    for (final value in cases) {
       expect(
         EngineRelease.compatible(
-          metadata,
-          contract,
+          value,
+          enginePolicy,
           applicationVersion: '0.1.1',
           platform: 'windows-x64',
         ),
         isNull,
       );
     }
-    final assets = metadata['assets'] as List;
-    (assets.last as Map)['browser_download_url'] =
-        'https://example.org/engine.exe';
     expect(
       EngineRelease.compatible(
-        metadata,
-        manifest(),
-        applicationVersion: '0.1.1',
+        release(),
+        enginePolicy,
+        applicationVersion: '0.2.0',
         platform: 'windows-x64',
+      ),
+      isNull,
+    );
+    expect(
+      EngineRelease.compatible(
+        release(),
+        enginePolicy,
+        applicationVersion: '0.1.1',
+        platform: 'linux-arm64',
       ),
       isNull,
     );
   });
 
+  test('Нет релизов — нет ложной готовности', () async {
+    final engine = manager(MockClient((_) async => http.Response('[]', 200)));
+    addTearDown(engine.close);
+    await engine.check();
+    expect(engine.state.status, EngineStatus.unavailable);
+  });
+
+  test('Чужой сервер не запрашивается после перенаправления', () async {
+    var calls = 0;
+    final engine = manager(
+      MockClient((_) async {
+        calls++;
+        return http.Response(
+          '',
+          302,
+          headers: {'location': 'https://example.org/'},
+        );
+      }),
+    );
+    addTearDown(engine.close);
+    await engine.check();
+    expect(engine.state.status, EngineStatus.failed);
+    expect(calls, 1);
+  });
+
+  test('Оборванная загрузка сохраняет старую запись', () async {
+    final pointer = File('${root.path}/active.json');
+    await pointer.writeAsString('{"old":true}');
+    final engine = manager(
+      MockClient(
+        (request) async => request.url.host == 'api.github.com'
+            ? http.Response(jsonEncode([release()]), 200)
+            : http.Response.bytes([1, 2], 200),
+      ),
+    );
+    addTearDown(engine.close);
+    await engine.check();
+    await engine.download();
+    expect(engine.state.status, EngineStatus.failed);
+    expect(await pointer.readAsString(), '{"old":true}');
+    expect(
+      root.listSync().whereType<File>().any((f) => f.path.endsWith('.part')),
+      false,
+    );
+  });
+
+  for (final zip in [true, false]) {
+    test(
+      'Распаковка ${zip ? 'ZIP' : 'tar.gz'} без извлечения посторонних путей',
+      () async {
+        final binary = utf8.encode('проверяемый файл');
+        final archive = Archive()
+          ..addFile(
+            ArchiveFile('wireproxy${zip ? '.exe' : ''}', binary.length, binary),
+          )
+          ..addFile(ArchiveFile('LICENSE', 3, [73, 83, 67]))
+          ..addFile(ArchiveFile('../outside', 1, [0]));
+        final bytes = zip
+            ? ZipEncoder().encode(archive)
+            : gzip.encode(TarEncoder().encode(archive));
+        final sum = sha256.convert(bytes).toString();
+        final fixture = EngineRelease(
+          engineTag,
+          engineSourceRevision,
+          EngineAsset(
+            zip ? 'fixture.zip' : 'fixture.tar.gz',
+            Uri.parse('https://github.com/'),
+            bytes.length,
+            sum,
+          ),
+          {
+            'packages': {
+              'test': {
+                'archiveSHA256': sum,
+                'binarySHA256': sha256.convert(binary).toString(),
+                'binarySize': binary.length,
+              },
+            },
+          },
+        );
+        final store = EngineStore(root, probe: (_, _) async {});
+        final partial = File('${root.path}/archive.part');
+        await partial.writeAsBytes(bytes);
+        final executable = await store.activate(
+          partial,
+          fixture,
+          zip ? 'windows-x64' : 'linux-x64',
+        );
+        expect(await executable.readAsBytes(), binary);
+        expect(
+          await File('${executable.parent.path}/LICENSE').readAsString(),
+          'ISC',
+        );
+        expect(await File('${root.path}/outside').exists(), false);
+        await executable.writeAsBytes([0]);
+        expect(await store.valid(executable, fixture.binary), false);
+      },
+    );
+  }
+
   test(
-    'Повреждение установленного файла обнаруживается при следующем запуске',
+    'Настоящий GitHub Release: загрузка, CLI, повторный запуск без сети',
     () async {
-      final engine = manager(client([release('v1.0.0', binary)]));
+      final engine = manager(http.Client());
+      addTearDown(engine.close);
       await engine.check();
+      expect(engine.state.status, EngineStatus.available);
       await engine.download();
-      final installed = engine.state.installed!;
-      final store = EngineStore(temporary, probe: (_, _) async {});
-      await store
-          .executable(installed)
-          .writeAsBytes(List.filled(binary.length, 0));
+      expect(engine.state.status, EngineStatus.ready);
+      final store = EngineStore(root);
+      final restored = await store.installed('0.1.1', 'windows-x64');
+      expect(restored!.tag, engineTag);
+      final offline = manager(MockClient((_) async => http.Response('', 503)));
+      addTearDown(offline.close);
+      await offline.check();
+      expect(offline.state.status, EngineStatus.ready);
+      expect(offline.state.offline, true);
+      await store.executable(restored).writeAsBytes([0]);
       expect(await store.installed('0.1.1', 'windows-x64'), isNull);
-      await engine.close();
     },
+    skip: !const bool.fromEnvironment('LIVE_ENGINE') || !Platform.isWindows,
+    timeout: const Timeout(Duration(minutes: 3)),
   );
 }

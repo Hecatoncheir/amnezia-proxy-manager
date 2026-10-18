@@ -1,38 +1,57 @@
 {
-  "repository": "synacker/amnezia-proxy",
-  "revision": "f5a7912dba8b128ae5c1a3f68a06be7c1668b908",
-  "goVersion": "go version go1.27.0 windows/amd64",
+  "repository": "bropines/awg-wireproxy",
+  "revision": "02588433b6328171b594d76f3f16bd3404258a83",
+  "goVersion": "go version go1.27.1 windows/amd64",
+  "upstreamLicense": "ISC",
   "distributionApproved": false,
   "builds": [
     {
-      "file": "awg-proxy-windows-amd64.exe",
+      "file": "wireproxy-windows-amd64.exe",
       "os": "windows",
       "arch": "amd64",
-      "size": 12340736,
-      "sha256": "cfb988f1504efdf5aba2f941482bcb104146fcaa5bebe8f67350a87335d2f798",
+      "size": 16951296,
+      "sha256": "71334b88acd779ba2d019ac1245212bb34036ae659f84bacedc6c90988c61499",
       "validation": "native CLI/test"
     },
     {
-      "file": "awg-proxy-linux-amd64",
+      "file": "wireproxy-linux-amd64",
       "os": "linux",
       "arch": "amd64",
-      "size": 12134650,
-      "sha256": "b011aedad86a49dc5f078dc6510060dab57dfed23097fd98bb6703a1e1eb7245",
+      "size": 16693215,
+      "sha256": "869ee8a2df2ddd0e174e16b000d43284da327578c051abdbed7f198dee98ba59",
       "validation": "cross-compile only"
     },
     {
-      "file": "awg-proxy-darwin-arm64",
+      "file": "wireproxy-darwin-arm64",
       "os": "darwin",
       "arch": "arm64",
-      "size": 11518914,
-      "sha256": "22f2050fab9efad4b07e793dea09681aab963099ee1439b88bc4f02ac4f8fffc",
+      "size": 15876338,
+      "sha256": "78273cc5c717677ce96fe0a76a278228e1fafe2f64ec04f72235aadfa7517763",
       "validation": "cross-compile only"
     }
   ],
   "modules": {
+    "github.com/akamensky/argparse": {
+      "version": "v1.4.0",
+      "sum": "h1:YGzvsTqCvbEZhL8zZu2AiA5nq805NZh75JNj4ajn1xc=",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "a44a68d10a668a3df47c40945b17c9acbbc301a4edb12a015b781b608b6651f1",
+          "firstLines": [
+            "MIT License",
+            "",
+            "Copyright (c) 2017 Alexey Kamenskiy",
+            "",
+            "Permission is hereby granted, free of charge, to any person obtaining a copy",
+            "of this software and associated documentation files (the \"Software\"), to deal"
+          ]
+        }
+      ]
+    },
     "golang.org/x/sys": {
-      "version": "v0.36.0",
-      "sum": "h1:KVRy2GtZBrk1cBYA7MKu5bEZFxQk4NIDV6RLVcC8o0k=",
+      "version": "v0.48.0",
+      "sum": "h1:bbX/i/6MgT9BVLM9RT1thmxL04yeTAhbEz4SyadbXoo=",
       "licenseFiles": [
         {
           "file": "LICENSE",
@@ -67,8 +86,8 @@
       ]
     },
     "golang.org/x/net": {
-      "version": "v0.44.0",
-      "sum": "h1:evd8IRDyfNBMBTTY5XRF1vaZlD+EmWx6x8PkhR04H/I=",
+      "version": "v0.59.0",
+      "sum": "h1:5zfYln+w5XCxwrnMMJPufRgNoXEaGxl0wo5GqPXyues=",
       "licenseFiles": [
         {
           "file": "LICENSE",
@@ -103,8 +122,8 @@
       ]
     },
     "golang.org/x/crypto": {
-      "version": "v0.42.0",
-      "sum": "h1:chiH31gIWm57EkTXpwnqf8qeuMUi0yekh6mT2AvFlqI=",
+      "version": "v0.57.0",
+      "sum": "h1:3ZVCjf8Ggz7zneR/EHRVx68Ctf+2pmIMP2UFhh9cC6M=",
       "licenseFiles": [
         {
           "file": "LICENSE",
@@ -120,13 +139,31 @@
         }
       ]
     },
-    "gvisor.dev/gvisor": {
-      "version": "v0.0.0-20231202080848-1f7806d17489",
-      "sum": "h1:ze1vwAdliUAr68RQ5NtufWaXaOg8WUO2OACzEV+TNdE=",
+    "github.com/MakeNowJust/heredoc/v2": {
+      "version": "v2.0.1",
+      "sum": "h1:rlCHh70XXXv7toz95ajQWOWQnN4WNLt0TdpZYIR/J6A=",
       "licenseFiles": [
         {
           "file": "LICENSE",
-          "sha256": "5af94223052169198cfa2195455b7d87209d9aa0fff4705822f328b4b272facb",
+          "sha256": "3cf06d7751ecd37a2822b9fa6ca09510436c0abbfdf3c6261f59c0f0a7f92fe3",
+          "firstLines": [
+            "The MIT License (MIT)",
+            "",
+            "Copyright (c) 2014-2019 TSUYUSATO Kitsune",
+            "",
+            "Permission is hereby granted, free of charge, to any person obtaining a copy",
+            "of this software and associated documentation files (the \"Software\"), to deal"
+          ]
+        }
+      ]
+    },
+    "gvisor.dev/gvisor": {
+      "version": "v0.0.0-20261009044828-bd481cb16efb",
+      "sum": "h1:FCtYhoVt78v8F7zzA68Aj0ZeyJuRd5goKlIV+99UsUw=",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "0fbab5c58efbdf6d31e8085214f2dd821659c03d73cff3ed2b08e98826ea1cd9",
           "firstLines": [
             "",
             "                                 Apache License",
@@ -138,9 +175,27 @@
         }
       ]
     },
+    "golang.org/x/exp": {
+      "version": "v0.0.0-20250711185948-6ae5c78190dc",
+      "sum": "h1:TS73t7x3KarrNd5qAipmspBDS1rkMcgVG/fS1aRb4Rc=",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "911f8f5782931320f5b8d1160a76365b83aea6447ee6c04fa6d5591467db9dad",
+          "firstLines": [
+            "Copyright 2009 The Go Authors.",
+            "",
+            "Redistribution and use in source and binary forms, with or without",
+            "modification, are permitted provided that the following conditions are",
+            "met:",
+            ""
+          ]
+        }
+      ]
+    },
     "golang.org/x/time": {
-      "version": "v0.9.0",
-      "sum": "h1:EsRrnYcQiGH+5FfbgvV4AP7qEZstoyrHB0DzarOQ4ZY=",
+      "version": "v0.15.0",
+      "sum": "h1:bbrp8t3bGUeFOx08pvsMYRTCVSMk89u4tKbNOZbp88U=",
       "licenseFiles": [
         {
           "file": "LICENSE",
@@ -174,12 +229,119 @@
         }
       ]
     },
-    "amnezia-proxy": {
-      "version": "f5a7912dba8b128ae5c1a3f68a06be7c1668b908",
+    "github.com/go-ini/ini": {
+      "version": "v1.67.0",
+      "sum": "h1:z6ZrTEZqSWOTyH2FlglNbNgARyHG8oLW9gMELqKr06A=",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "f6918bd93ffe07f4b2c61b8287c32cb3122e08aed0be50f1c7d0eddc87877a8f",
+          "firstLines": [
+            "Apache License",
+            "Version 2.0, January 2004",
+            "http://www.apache.org/licenses/",
+            "",
+            "TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION",
+            ""
+          ]
+        }
+      ]
+    },
+    "github.com/things-go/go-socks5": {
+      "version": "v0.1.3",
+      "sum": "h1:W6lC9bUiuubcVVGU5BRRrwUP6k/7HEwrJm5O+mIUHDE=",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "831892cd31b9eef0311bb1de9014527ef5d3592eed7add1f9f829510d2065e62",
+          "firstLines": [
+            "The MIT License (MIT)",
+            "",
+            "Copyright (c) 2014 Armon Dadgar",
+            "",
+            "Permission is hereby granted, free of charge, to any person obtaining a copy of",
+            "this software and associated documentation files (the \"Software\"), to deal in"
+          ]
+        }
+      ]
+    },
+    "github.com/bropines/awg-wireproxy": {
+      "version": "02588433b6328171b594d76f3f16bd3404258a83",
       "sum": null,
-      "licenseFiles": []
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "59c7c927100fc33a6d95bd8ff6b9d0519dc76dbbd24aaa9c8728c1f480281d69",
+          "firstLines": [
+            "Copyright (c) 2026 Tsz Fung Wong <im@windtfw.com>",
+            "Copyright (c) 2026 bropines (AmneziaWG & UDP Proxy Tunnel adaptations)",
+            "",
+            "Permission to use, copy, modify, and distribute this software for any",
+            "purpose with or without fee is hereby granted, provided that the above",
+            "copyright notice and this permission notice appear in all copies."
+          ]
+        }
+      ]
+    },
+    "github.com/landlock-lsm/go-landlock": {
+      "version": "v0.10.1",
+      "sum": "h1:MkvuYeTgGRpOnROAO9V2gV3C5lctFr6O0b9wnPWcQWk=",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "611f2b892bfaa050cd3ceee982c32687b194ef8ce32295a22943da780d329650",
+          "firstLines": [
+            "MIT License",
+            "",
+            "Copyright (c) 2021 Günther Noack",
+            "",
+            "PERMISSION is hereby granted, free of charge, to any person obtaining a copy",
+            "of this software and associated documentation files (the \"Software\"), to deal"
+          ]
+        }
+      ]
+    },
+    "suah.dev/protect": {
+      "version": "v1.2.4",
+      "sum": "h1:iVZG/zQB63FKNpITDYM/cXoAeCTIjCiXHuFVByJFDzg=",
+      "licenseFiles": [
+        {
+          "file": "LICENSE",
+          "sha256": "43f42375fc0963cec1a041ae3a69e9a5803dceb20d513889d2d153bc12de408e",
+          "firstLines": [
+            "/*",
+            " * Copyright (c) 2020 Aaron Bieber <aaron@bolddaemon.com>",
+            " *",
+            " * Permission to use, copy, modify, and distribute this software for any",
+            " * purpose with or without fee is hereby granted, provided that the above",
+            " * copyright notice and this permission notice appear in all copies."
+          ]
+        }
+      ]
+    },
+    "kernel.org/pub/linux/libs/security/libcap/psx": {
+      "version": "v1.2.77",
+      "sum": "h1:Z06sMOzc0GNCwp6efaVrIrz4ywGJ1v+DP0pjVkOfDuA=",
+      "licenseFiles": [
+        {
+          "file": "License",
+          "sha256": "279fa656c62857d42952b86a0789b98669ca1cb4b324a8d9e91397c174af4c14",
+          "firstLines": [
+            "/* SPDX-License-Identifier: BSD-3-Clause OR GPL-2.0-only */",
+            "",
+            "Unless otherwise *explicitly* stated, the following text describes the",
+            "licensed conditions under which the contents of this libcap/psx release",
+            "may be used and distributed.",
+            ""
+          ]
+        }
+      ]
     }
   },
-  "tests": "ok  \tamnezia-proxy\t0.467s",
+  "tests": {
+    "exitCode": 1,
+    "output": "ok  \tgithub.com/bropines/awg-wireproxy\t1.183s\n--- FAIL: TestConfigMaskedAndSaved (0.01s)\n    admin_test.go:203: mode changed to -rw-rw-rw-\nFAIL\nFAIL\tgithub.com/bropines/awg-wireproxy/admin\t0.693s\n?   \tgithub.com/bropines/awg-wireproxy/cmd/wireproxy\t[no test files]\nFAIL\n"
+  },
+  "coreTests": "=== RUN   TestAWGV3Params\n--- PASS: TestAWGV3Params (0.00s)\n=== RUN   TestAWGV3Invalid\n--- PASS: TestAWGV3Invalid (0.00s)\n=== RUN   TestWireguardConfWithoutSubnet\n--- PASS: TestWireguardConfWithoutSubnet (0.00s)\n=== RUN   TestWireguardConfWithSubnet\n--- PASS: TestWireguardConfWithSubnet (0.00s)\n=== RUN   TestWireguardConfWithManyAddress\n--- PASS: TestWireguardConfWithManyAddress (0.00s)\n=== RUN   TestCheckAliveIntervalMustBePositive\n--- PASS: TestCheckAliveIntervalMustBePositive (0.00s)\n=== RUN   TestInactivityTimeoutCannotBeNegative\n--- PASS: TestInactivityTimeoutCannotBeNegative (0.00s)\n=== RUN   TestTunnelPlainWireGuard\n--- PASS: TestTunnelPlainWireGuard (0.02s)\n=== RUN   TestTunnelAmneziaWG1\n--- PASS: TestTunnelAmneziaWG1 (0.02s)\n=== RUN   TestTunnelAmneziaWG3\n--- PASS: TestTunnelAmneziaWG3 (2.02s)\n=== RUN   TestHTTPServerServeGet\n--- PASS: TestHTTPServerServeGet (0.00s)\n=== RUN   TestHTTPServerServeFailureClosesConn\n2026/10/18 20:18:26 read request failed: malformed HTTP request \"INVALID\"\n--- PASS: TestHTTPServerServeFailureClosesConn (0.05s)\n=== RUN   TestUDPSessionCloseIsIdempotent\n--- PASS: TestUDPSessionCloseIsIdempotent (0.00s)\n=== RUN   TestDomainRouterShouldTunnel\n=== RUN   TestDomainRouterShouldTunnel/exact_match\n=== RUN   TestDomainRouterShouldTunnel/subdomain_match\n=== RUN   TestDomainRouterShouldTunnel/deep_subdomain_match\n=== RUN   TestDomainRouterShouldTunnel/second_pattern_exact\n=== RUN   TestDomainRouterShouldTunnel/trailing_dot_stripped\n=== RUN   TestDomainRouterShouldTunnel/uppercase_normalised\n=== RUN   TestDomainRouterShouldTunnel/no_match\n=== RUN   TestDomainRouterShouldTunnel/partial_no_match_(suffix_guard)\n=== RUN   TestDomainRouterShouldTunnel/ip_literal_no_match\n--- PASS: TestDomainRouterShouldTunnel (0.00s)\n    --- PASS: TestDomainRouterShouldTunnel/exact_match (0.00s)\n    --- PASS: TestDomainRouterShouldTunnel/subdomain_match (0.00s)\n    --- PASS: TestDomainRouterShouldTunnel/deep_subdomain_match (0.00s)\n    --- PASS: TestDomainRouterShouldTunnel/second_pattern_exact (0.00s)\n    --- PASS: TestDomainRouterShouldTunnel/trailing_dot_stripped (0.00s)\n    --- PASS: TestDomainRouterShouldTunnel/uppercase_normalised (0.00s)\n    --- PASS: TestDomainRouterShouldTunnel/no_match (0.00s)\n    --- PASS: TestDomainRouterShouldTunnel/partial_no_match_(suffix_guard) (0.00s)\n    --- PASS: TestDomainRouterShouldTunnel/ip_literal_no_match (0.00s)\n=== RUN   TestDomainRouterEmptyTunnelsEverything\n--- PASS: TestDomainRouterEmptyTunnelsEverything (0.00s)\n=== RUN   TestHostFromAddr\n--- PASS: TestHostFromAddr (0.00s)\n=== RUN   TestParseRegexListMultiLine\n2026/10/18 20:18:26 route: www.example.com -> TUNNEL\n2026/10/18 20:18:26 route: cache123.cdn.net -> TUNNEL\n2026/10/18 20:18:26 route: evil.net -> DIRECT\n--- PASS: TestParseRegexListMultiLine (0.00s)\n=== RUN   TestParseRegexListInvalidRejected\n--- PASS: TestParseRegexListInvalidRejected (0.00s)\n=== RUN   TestParseConfigDefaultsNoRouting\n--- PASS: TestParseConfigDefaultsNoRouting (0.00s)\nPASS\nok  \tgithub.com/bropines/awg-wireproxy\t2.674s",
   "vet": "ok"
 }

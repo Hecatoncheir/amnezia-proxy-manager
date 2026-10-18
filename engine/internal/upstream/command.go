@@ -1,22 +1,22 @@
-// Package upstream описывает запуск отдельно собранного amnezia-proxy.
+// Package upstream описывает запуск отдельно собранного awg-wireproxy.
 package upstream
 
 import (
 	"context"
 	"errors"
 	"net"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
-const Revision = "f5a7912dba8b128ae5c1a3f68a06be7c1668b908"
+const Revision = "02588433b6328171b594d76f3f16bd3404258a83"
 
 type Config struct {
 	Binary  string
 	Profile string
-	SOCKS   string
-	HTTP    string
 }
 
 func validateAddress(address string) error {
@@ -37,15 +37,39 @@ func Command(ctx context.Context, cfg Config) (*exec.Cmd, error) {
 	if !filepath.IsAbs(cfg.Binary) || !filepath.IsAbs(cfg.Profile) {
 		return nil, errors.New("нужны абсолютные пути движка и профиля")
 	}
-	if err := validateAddress(cfg.SOCKS); err != nil {
+	// Profile — только сгенерированная менеджером конфигурация, не сырой импорт.
+	cmd := exec.CommandContext(ctx, cfg.Binary, "--config", cfg.Profile, "--silent")
+	// Переменные upstream не должны неявно включать веб-панель.
+	for _, entry := range os.Environ() {
+		key, _, _ := strings.Cut(entry, "=")
+		if !strings.HasPrefix(strings.ToUpper(key), "WIREPROXY_") {
+			cmd.Env = append(cmd.Env, entry)
+		}
+	}
+	return cmd, nil
+}
+
+// ConfigTestCommand проверяет сгенерированную конфигурацию без запуска туннеля.
+func ConfigTestCommand(ctx context.Context, cfg Config) (*exec.Cmd, error) {
+	cmd, err := Command(ctx, cfg)
+	if err != nil {
 		return nil, err
 	}
-	if err := validateAddress(cfg.HTTP); err != nil {
-		return nil, err
+	cmd.Args = append(cmd.Args, "--configtest")
+	return cmd, nil
+}
+
+// ProxySections добавляется к разрешённым секциям профиля после разбора M2.
+// Сырые конфигурации, WGConfig, PostUp/PostDown и секции upstream не импортируются.
+func ProxySections(socks, http string) (string, error) {
+	if err := validateAddress(socks); err != nil {
+		return "", err
 	}
-	if cfg.SOCKS == cfg.HTTP {
-		return nil, errors.New("порты прокси должны различаться")
+	if err := validateAddress(http); err != nil {
+		return "", err
 	}
-	return exec.CommandContext(ctx, cfg.Binary, "-config", cfg.Profile,
-		"-socks-listen", cfg.SOCKS, "-http-listen", cfg.HTTP), nil
+	if socks == http {
+		return "", errors.New("порты прокси должны различаться")
+	}
+	return "\n[Socks5]\nBindAddress = " + socks + "\n\n[http]\nBindAddress = " + http + "\n", nil
 }

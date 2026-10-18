@@ -27,7 +27,7 @@ func VerifyBinary(path, expectedSHA256 string) error {
 		return errors.New("контрольная сумма backend не совпадает")
 	}
 	info, err := buildinfo.Read(file)
-	if err != nil || info.Path != "amnezia-proxy" {
+	if err != nil || info.Path != "github.com/bropines/awg-wireproxy/cmd/wireproxy" {
 		return errors.New("неизвестный формат backend")
 	}
 	settings := make(map[string]string)
