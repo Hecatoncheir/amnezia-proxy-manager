@@ -1,0 +1,23 @@
+# Сборки и локальные настройки
+/build/
+/dist/
+/work/
+*.exe
+*.dll
+*.so
+*.dylib
+*.log
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+# Секреты: реальные VPN-профили никогда не коммитить
+*.vpn
+*.conf
+*.key
+*.pem
+/profiles/
+/secrets/
