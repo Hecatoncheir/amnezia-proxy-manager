@@ -8,8 +8,15 @@ import 'package:archive/archive.dart';
 import 'engine_release.dart';
 
 class EngineStore {
-  EngineStore(this.root, {Future<void> Function(File, String)? probe})
-    : probe = probe ?? verifyEngineExecutable;
+  EngineStore(
+    this.root, {
+    Future<void> Function(File, String)? probe,
+    this.policy = enginePolicy,
+  }) : probe =
+           probe ??
+           ((file, platform) =>
+               verifyEngineExecutable(file, platform, policy: policy));
+  final Map<String, dynamic> policy;
   final Directory root;
   final Future<void> Function(File, String) probe;
 
@@ -37,6 +44,7 @@ class EngineStore {
         data['manifest'],
         applicationVersion: applicationVersion,
         platform: platform,
+        policy: policy,
       );
       if (release == null ||
           !await valid(executable(release), release.binary)) {
@@ -65,7 +73,10 @@ class EngineStore {
         .where((entry) => entry.name == release.binaryName)
         .toList();
     final licenses = unpacked.files
-        .where((entry) => entry.name == 'LICENSE')
+        .where(
+          (entry) =>
+              entry.name == (release.package['licenseName'] ?? 'LICENSE'),
+        )
         .toList();
     if (matches.length != 1 ||
         !matches.single.isFile ||
@@ -120,7 +131,24 @@ class EngineStore {
   }
 }
 
-Future<void> verifyEngineExecutable(File file, String platform) async {
+Future<void> verifyEngineExecutable(
+  File file,
+  String platform, {
+  Map<String, dynamic> policy = enginePolicy,
+}) async {
+  if (policy['family'] == 'xray') {
+    if (!await engineArchitectureMatches(file, platform)) {
+      throw const FormatException('Неверная архитектура Xray');
+    }
+    final result = await Process.run(file.path, [
+      'version',
+    ], runInShell: false).timeout(const Duration(seconds: 10));
+    if (result.exitCode != 0 ||
+        !result.stdout.toString().startsWith('Xray ${policy['version']} ')) {
+      throw const FormatException('Несовместимая версия Xray');
+    }
+    return;
+  }
   if (!await engineArchitectureMatches(file, platform)) {
     throw const FormatException('Неверная архитектура движка');
   }

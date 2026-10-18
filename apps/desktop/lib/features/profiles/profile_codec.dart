@@ -1,3 +1,5 @@
+import 'xray_codec.dart';
+
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -16,6 +18,7 @@ class ProfileProblem implements Exception {
 class ImportedProfile {
   const ImportedProfile(this.configuration, this.format);
   final String configuration, format;
+  String get family => format == 'VLESS' ? 'xray' : 'awg';
   @override
   String toString() => 'ImportedProfile(скрыто)';
 }
@@ -72,16 +75,57 @@ class ProfileCodec {
           text.startsWith(';')) {
         return ImportedProfile(normalize(text), 'AmneziaWG');
       }
+      if (text.startsWith('vless://')) {
+        return ImportedProfile(
+          normalizeConfiguration(jsonEncode(XrayCodec().fromUri(text))),
+          'VLESS',
+        );
+      }
       final json = text.startsWith('{') ? text : await _decodeUri(text);
-      return ImportedProfile(
-        normalize(_fromAmnezia(_jsonObject(json))),
-        'AmneziaVPN',
-      );
+      final data = _jsonObject(json);
+      if (data.containsKey('outbounds')) {
+        return ImportedProfile(normalizeConfiguration(json), 'VLESS');
+      }
+      if (data['defaultContainer'] == 'amnezia-xray') {
+        final containers = data['containers'];
+        if (containers is! List) {
+          throw const ProfileProblem('Нет конфигурации Xray.');
+        }
+        final matches = containers
+            .whereType<Map>()
+            .where((c) => c['container'] == 'amnezia-xray')
+            .toList();
+        if (matches.length != 1 ||
+            matches.single['xray'] is! Map ||
+            matches.single['xray']['last_config'] is! String) {
+          throw const ProfileProblem('Нет клиентской конфигурации Xray.');
+        }
+        return ImportedProfile(
+          normalizeConfiguration(matches.single['xray']['last_config']),
+          'VLESS',
+        );
+      }
+      return ImportedProfile(normalize(_fromAmnezia(data)), 'AmneziaVPN');
     } on ProfileProblem {
       rethrow;
     } catch (_) {
       // Ошибки декодеров могут содержать фрагменты входа; наружу не передавать.
       throw const ProfileProblem('Повреждённый или неподдерживаемый профиль.');
+    }
+  }
+
+  String normalizeConfiguration(String text) {
+    if (!text.trimLeft().startsWith('{')) return normalize(text);
+    try {
+      final result = XrayCodec().normalize(_jsonObject(text));
+      if (utf8.encode(result).length > maxConfigBytes) {
+        throw const FormatException('Слишком большая конфигурация');
+      }
+      return result;
+    } catch (_) {
+      throw const ProfileProblem(
+        'Неподдерживаемая или повреждённая конфигурация VLESS.',
+      );
     }
   }
 

@@ -4,12 +4,14 @@ import 'dart:math';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'profile_codec.dart';
+import 'local_profile_import.dart';
 import 'profile_vault.dart';
 
 class ProfileSummary {
   const ProfileSummary(this.id, this.name, this.format, this.temporary);
   final String id, name, format;
   final bool temporary;
+  String get family => format == 'VLESS' ? 'xray' : 'awg';
 }
 
 class ProfilesState {
@@ -19,7 +21,9 @@ class ProfilesState {
     this.busy = false,
     this.message,
     this.offerTemporary = false,
+    this.requiredEngine = 'awg',
   });
+  final String requiredEngine;
   final List<ProfileSummary> profiles;
   final String? selected, message;
   final bool busy, offerTemporary;
@@ -60,6 +64,7 @@ class ProfilesCubit extends Cubit<ProfilesState> {
   _Record? _pending;
   String? _selected;
   String? _snapshot;
+  String _requiredEngine = 'awg';
   bool _loaded = false, _vaultReady = false, _busy = false;
 
   Future<void> load() async {
@@ -102,7 +107,7 @@ class ProfilesCubit extends Cubit<ProfilesState> {
       final format = record['format'] as String;
       if (!RegExp(r'^[a-f0-9]{32}$').hasMatch(id) ||
           restored.any((e) => e.id == id) ||
-          !['AmneziaWG', 'AmneziaVPN'].contains(format)) {
+          !['AmneziaWG', 'AmneziaVPN', 'VLESS'].contains(format)) {
         throw const ProfileProblem('Повреждено хранилище.');
       }
       restored.add(
@@ -110,7 +115,7 @@ class ProfilesCubit extends Cubit<ProfilesState> {
           id,
           name,
           format,
-          codec.normalize(record['configuration'] as String),
+          codec.normalizeConfiguration(record['configuration'] as String),
         ),
       );
     }
@@ -119,6 +124,28 @@ class ProfilesCubit extends Cubit<ProfilesState> {
     _selected = restored.any((e) => e.id == selected)
         ? selected as String
         : restored.firstOrNull?.id;
+    _requiredEngine =
+        restored.where((e) => e.id == _selected).firstOrNull?.format == 'VLESS'
+        ? 'xray'
+        : 'awg';
+  }
+
+  Future<void> importLocal({Future<List<int>> Function()? reader}) async {
+    if (_busy || !_loaded || _pending != null) return;
+    _busy = true;
+    _publish(busy: true, message: 'Читаем выбранный профиль AmneziaVPN…');
+    try {
+      final bytes = await (reader ?? readLocalAmneziaProfile)();
+      if (isClosed) return;
+      _busy = false;
+      await importBytes(bytes, 'AmneziaVPN');
+    } on ProfileProblem catch (error) {
+      _publish(message: error.message);
+    } catch (_) {
+      _publish(message: 'Не удалось прочитать установленную AmneziaVPN.');
+    } finally {
+      _busy = false;
+    }
   }
 
   Future<void> importBytes(List<int> bytes, String name) async {
@@ -131,8 +158,19 @@ class ProfilesCubit extends Cubit<ProfilesState> {
       }
       final title = _name(name);
       final imported = await codec.decode(bytes);
+      _requiredEngine = imported.family;
+      _publish(busy: true, message: 'Проверяем конфигурацию через движок…');
       await validate(imported.configuration);
       if (isClosed) return;
+      final duplicate = _records
+          .where((record) => record.configuration == imported.configuration)
+          .firstOrNull;
+      if (duplicate != null) {
+        if (_vaultReady) await _persist(_records, duplicate.id);
+        _selected = duplicate.id;
+        _publish(message: 'Этот профиль уже импортирован и выбран.');
+        return;
+      }
       final random = Random.secure();
       final id = List.generate(
         16,
@@ -205,6 +243,9 @@ class ProfilesCubit extends Cubit<ProfilesState> {
     try {
       if (_vaultReady) await _persist(_records, id);
       _selected = id;
+      _requiredEngine = _records.firstWhere((e) => e.id == id).format == 'VLESS'
+          ? 'xray'
+          : 'awg';
       _publish();
     } catch (_) {
       _publish(message: 'Не удалось сохранить выбор профиля.');
@@ -290,6 +331,7 @@ class ProfilesCubit extends Cubit<ProfilesState> {
     if (!isClosed) {
       emit(
         ProfilesState(
+          requiredEngine: _requiredEngine,
           profiles: List.unmodifiable(_records.map((e) => e.summary)),
           selected: _selected,
           busy: busy,

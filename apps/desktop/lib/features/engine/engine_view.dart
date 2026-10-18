@@ -7,8 +7,15 @@ import 'engine_manager.dart';
 import 'download_ring.dart';
 
 class EngineView extends StatefulWidget {
-  const EngineView({super.key, required this.manager});
+  const EngineView({
+    super.key,
+    required this.manager,
+    this.selector,
+    this.ownsManager = true,
+  });
+  final Widget? selector;
   final EngineManager manager;
+  final bool ownsManager;
 
   @override
   State<EngineView> createState() => _EngineViewState();
@@ -18,12 +25,12 @@ class _EngineViewState extends State<EngineView> {
   @override
   void initState() {
     super.initState();
-    unawaited(widget.manager.check());
+    if (widget.ownsManager) unawaited(widget.manager.check());
   }
 
   @override
   void dispose() {
-    unawaited(widget.manager.close());
+    if (widget.ownsManager) unawaited(widget.manager.close());
     super.dispose();
   }
 
@@ -36,11 +43,28 @@ class _EngineViewState extends State<EngineView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'ДВИЖОК AWG-WIREPROXY',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            Row(
+              children: [
+                Icon(
+                  Icons.memory_outlined,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child:
+                      widget.selector ??
+                      Text(
+                        widget.manager.policy['label'] as String,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                ),
+                if (state.status == EngineStatus.ready)
+                  Icon(
+                    Icons.check_circle_outline,
+                    color: Theme.of(context).colorScheme.primary,
+                    size: 20,
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
             if (state.status != EngineStatus.downloading) Text(_message(state)),
@@ -71,8 +95,7 @@ class _EngineViewState extends State<EngineView> {
 }
 
 String _message(EngineState state) => switch (state.status) {
-  EngineStatus.checking =>
-    'Проверяем установленный движок и совместимые выпуски…',
+  EngineStatus.checking => 'Проверяем движок…',
   EngineStatus.unavailable =>
     'В репозитории движка пока нет совместимого выпуска для этой системы.',
   EngineStatus.available =>
@@ -85,7 +108,7 @@ String _message(EngineState state) => switch (state.status) {
   EngineStatus.ready =>
     state.offline
         ? 'Движок ${state.installed!.tag} проверен. Проверка обновлений временно недоступна.'
-        : 'Движок ${state.installed!.tag} установлен и проверен.',
+        : 'Готов к работе · ${state.installed!.tag}',
   EngineStatus.failed =>
     state.installed == null
         ? 'Не удалось проверить или установить движок. Повторите попытку.'

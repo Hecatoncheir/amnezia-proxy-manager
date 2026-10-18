@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -5,13 +7,78 @@ import '../../settings/settings_cubit.dart';
 import '../updates/updates_view.dart';
 import '../engine/engine_manager.dart';
 import '../engine/engine_view.dart';
+import '../engine/engine_panel.dart';
 import '../profiles/profiles_cubit.dart';
 import '../profiles/profiles_view.dart';
 
-class DashboardPage extends StatelessWidget {
-  const DashboardPage({super.key, this.engine, this.profiles});
+class DashboardPage extends StatefulWidget {
+  const DashboardPage({super.key, this.engine, this.profiles, this.xray});
   final EngineManager? engine;
+  final EngineManager? xray;
   final ProfilesCubit? profiles;
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.engine != null) unawaited(widget.engine!.check());
+    if (widget.xray != null) unawaited(widget.xray!.check());
+    if (widget.profiles != null) unawaited(widget.profiles!.load());
+  }
+
+  @override
+  void dispose() {
+    if (widget.engine != null) unawaited(widget.engine!.close());
+    if (widget.xray != null) unawaited(widget.xray!.close());
+    if (widget.profiles != null) unawaited(widget.profiles!.close());
+    super.dispose();
+  }
+
+  void _openMenu(String section) {
+    final content = switch (section) {
+      'profiles' =>
+        widget.profiles == null
+            ? const Text('Профили пока недоступны')
+            : ProfilesView(manager: widget.profiles!, ownsManager: false),
+      'engines' =>
+        widget.engine == null
+            ? const Text('Движки пока недоступны')
+            : widget.xray != null && widget.profiles != null
+            ? EnginePanel(
+                awg: widget.engine!,
+                xray: widget.xray!,
+                profiles: widget.profiles!,
+                ownsManagers: false,
+              )
+            : EngineView(manager: widget.engine!, ownsManager: false),
+      _ => null,
+    };
+    showDialog<void>(
+      context: context,
+      builder: (_) => section == 'settings'
+          ? BlocProvider.value(
+              value: context.read<SettingsCubit>(),
+              child: const _SettingsDialog(),
+            )
+          : AlertDialog(
+              title: Text(section == 'profiles' ? 'Профили' : 'Движки'),
+              content: SizedBox(
+                width: 480,
+                child: SingleChildScrollView(child: content),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Готово'),
+                ),
+              ],
+            ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -22,18 +89,9 @@ class DashboardPage extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.all(28),
             children: [
-              const _Header(),
+              _Header(onSelected: _openMenu),
               const SizedBox(height: 24),
-              if (engine != null) ...[
-                EngineView(manager: engine!),
-                const SizedBox(height: 16),
-              ],
               const _ConnectionCard(),
-              const SizedBox(height: 16),
-              if (profiles != null)
-                ProfilesView(manager: profiles!)
-              else
-                const _ProfileCard(),
               const SizedBox(height: 16),
               const _TrafficCards(),
             ],
@@ -45,7 +103,8 @@ class DashboardPage extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header();
+  const _Header({required this.onSelected});
+  final ValueChanged<String> onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -75,16 +134,36 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
-        IconButton(
-          tooltip: 'Настройки',
-          icon: Icon(Icons.tune, color: colors.onSurfaceVariant),
-          onPressed: () => showDialog<void>(
-            context: context,
-            builder: (_) => BlocProvider.value(
-              value: context.read<SettingsCubit>(),
-              child: const _SettingsDialog(),
+        PopupMenuButton<String>(
+          tooltip: 'Меню',
+          icon: Icon(Icons.menu, color: colors.onSurfaceVariant),
+          onSelected: onSelected,
+          itemBuilder: (_) => const [
+            PopupMenuItem(
+              value: 'profiles',
+              child: ListTile(
+                leading: Icon(Icons.vpn_key_outlined),
+                title: Text('Профили'),
+                contentPadding: EdgeInsets.zero,
+              ),
             ),
-          ),
+            PopupMenuItem(
+              value: 'engines',
+              child: ListTile(
+                leading: Icon(Icons.memory_outlined),
+                title: Text('Движки'),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            PopupMenuItem(
+              value: 'settings',
+              child: ListTile(
+                leading: Icon(Icons.tune),
+                title: Text('Настройки'),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -166,67 +245,20 @@ class _ConnectionCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: colors.onSurface.withValues(alpha: 0.08),
-                    shape: BoxShape.circle,
+                IconButton.filled(
+                  tooltip: 'Подключение станет доступно после реализации управления VPN-процессом',
+                  onPressed: null,
+                  style: IconButton.styleFrom(
+                    padding: const EdgeInsets.all(18),
+                    disabledBackgroundColor: colors.onSurface.withValues(
+                      alpha: 0.08,
+                    ),
+                    disabledForegroundColor:
+                        Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xffc7785b)
+                        : const Color(0xffa34f38),
                   ),
-                  child: Icon(
-                    Icons.power_settings_new,
-                    size: 32,
-                    color: colors.primary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Tooltip(
-              message: 'Подключение станет доступно после реализации управления VPN-процессом',
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  disabledBackgroundColor: colors.primary.withValues(
-                    alpha: 0.55,
-                  ),
-                  disabledForegroundColor: colors.onPrimary,
-                ),
-                onPressed: null,
-                child: const Text('Подключить SOCKS5'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfileCard extends StatelessWidget {
-  const _ProfileCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'ПРОФИЛЬ VPN',
-              style: TextStyle(color: colors.onSurfaceVariant),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Icon(Icons.dns_outlined, color: colors.secondary),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'AmneziaWG · профиль не выбран',
-                    style: TextStyle(fontSize: 18),
-                  ),
+                  icon: const Icon(Icons.power_settings_new, size: 32),
                 ),
               ],
             ),

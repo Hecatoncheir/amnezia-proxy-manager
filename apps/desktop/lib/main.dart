@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'features/dashboard/dashboard_page.dart';
 import 'features/engine/engine_manager.dart';
+import 'features/engine/xray_policy.dart';
 import 'features/profiles/profile_validator.dart';
 import 'features/profiles/profile_vault.dart';
 import 'features/profiles/profiles_cubit.dart';
@@ -14,16 +15,18 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await WindowPlacement.initialize();
   final engine = EngineManager();
+  final xray = EngineManager(policy: xrayPolicy);
   final profiles = ProfilesCubit(
     vault: SystemProfileVault(),
-    validate: EngineProfileValidator(engine).validate,
+    validate: EngineProfileValidator(engine, xray: xray).validate,
   );
-  runApp(ProxyManagerApp(engine: engine, profiles: profiles));
+  runApp(ProxyManagerApp(engine: engine, xray: xray, profiles: profiles));
 }
 
 class ProxyManagerApp extends StatelessWidget {
-  const ProxyManagerApp({super.key, this.engine, this.profiles});
+  const ProxyManagerApp({super.key, this.engine, this.profiles, this.xray});
   final EngineManager? engine;
+  final EngineManager? xray;
   final ProfilesCubit? profiles;
 
   @override
@@ -39,7 +42,7 @@ class ProxyManagerApp extends StatelessWidget {
         themeAnimationDuration: MediaQuery.disableAnimationsOf(context)
             ? Duration.zero
             : const Duration(milliseconds: 240),
-        home: DashboardPage(engine: engine, profiles: profiles),
+        home: DashboardPage(engine: engine, xray: xray, profiles: profiles),
       ),
     ),
   );

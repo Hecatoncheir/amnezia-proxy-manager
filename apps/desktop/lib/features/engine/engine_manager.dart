@@ -42,11 +42,20 @@ class EngineManager extends Cubit<EngineState> {
     Future<String> Function()? readVersion,
     Future<Directory> Function()? directory,
     this.probe,
+    this.policy = enginePolicy,
   }) : client = client ?? http.Client(),
        platform = platform ?? installedAppPlatform(),
        readVersion = readVersion ?? installedAppVersion,
-       directory = directory ?? _engineDirectory,
+       directory =
+           directory ??
+           (() async {
+             final root = await _engineDirectory();
+             return policy['family'] == 'xray'
+                 ? Directory('${root.path}/xray')
+                 : root;
+           }),
        super(const EngineState(EngineStatus.checking));
+  final Map<String, dynamic> policy;
   final http.Client client;
   final String platform;
   final Future<String> Function() readVersion;
@@ -62,10 +71,12 @@ class EngineManager extends Cubit<EngineState> {
     _publish(const EngineState(EngineStatus.checking));
     try {
       final version = await readVersion();
-      _store = EngineStore(await directory(), probe: probe);
+      _store = EngineStore(await directory(), probe: probe, policy: policy);
       installed = await _store!.installed(version, platform);
-      final release = await EngineCatalog(client)
-          .latestCompatible(version, platform);
+      final release = await EngineCatalog(
+        client,
+        policy: policy,
+      ).latestCompatible(version, platform);
       final newer = _newer(release, installed);
       var status = installed != null
           ? EngineStatus.ready

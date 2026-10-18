@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -16,7 +17,19 @@ const MaxConfig = 65536
 
 // Validate не возвращает stderr upstream: он может содержать ключи.
 func Validate(binary, sum string, input io.Reader) (result error) {
-	if err := upstream.VerifyBinary(binary, sum); err != nil {
+	return validate(binary, sum, input, upstream.VerifyBinary, func(ctx context.Context, binary, path string) (*exec.Cmd, error) {
+		return upstream.ConfigTestCommand(ctx, upstream.Config{Binary: binary, Profile: path})
+	})
+}
+
+func ValidateXray(binary, sum string, input io.Reader) error {
+	return validate(binary, sum, input, upstream.VerifyXrayBinary, func(ctx context.Context, binary, path string) (*exec.Cmd, error) {
+		return upstream.XrayCommand(ctx, binary, path, true)
+	})
+}
+
+func validate(binary, sum string, input io.Reader, verify func(string, string) error, commandFor func(context.Context, string, string) (*exec.Cmd, error)) (result error) {
+	if err := verify(binary, sum); err != nil {
 		return errors.New("движок не прошёл проверку")
 	}
 	data, err := io.ReadAll(io.LimitReader(input, MaxConfig+1))
@@ -45,7 +58,7 @@ func Validate(binary, sum string, input io.Reader) (result error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
 	defer cancel()
-	command, err := upstream.ConfigTestCommand(ctx, upstream.Config{Binary: binary, Profile: path})
+	command, err := commandFor(ctx, binary, path)
 	if err != nil {
 		return errors.New("не удалось подготовить проверку")
 	}

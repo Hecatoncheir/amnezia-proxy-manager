@@ -4,6 +4,10 @@ const engineRepository = 'bropines/awg-wireproxy';
 const engineSourceRevision = '02588433b6328171b594d76f3f16bd3404258a83';
 const engineTag = 'v2.1.0';
 const Map<String, dynamic> enginePolicy = {
+  "repository": engineRepository,
+  "tag": engineTag,
+  "family": "awg",
+  "label": "AWG-WIREPROXY",
   "schemaVersion": 1,
   "cliContract": 2,
   "sourceRevision": "02588433b6328171b594d76f3f16bd3404258a83",
@@ -50,11 +54,16 @@ class EngineAsset {
   final Uri url;
   final int size;
 
-  static EngineAsset? parse(Map data, String tag, String name) {
+  static EngineAsset? parse(
+    Map data,
+    String tag,
+    String name, {
+    String repository = engineRepository,
+  }) {
     final size = data['size'], digest = data['digest'];
     final url = Uri.https(
       'github.com',
-      '/$engineRepository/releases/download/$tag/$name',
+      '/$repository/releases/download/$tag/$name',
     );
     if (data['name'] != name ||
         data['browser_download_url'] != url.toString()) {
@@ -75,8 +84,10 @@ class EngineRelease {
   final EngineAsset asset;
   final Map manifest;
 
+  String get family => manifest['family'] as String? ?? 'awg';
   String get binaryName =>
-      asset.name.endsWith('.zip') ? 'wireproxy.exe' : 'wireproxy';
+      package['binaryName'] as String? ??
+      (asset.name.endsWith('.zip') ? 'wireproxy.exe' : 'wireproxy');
   Map get package => (manifest['packages'] as Map).values.firstWhere(
     (value) => value['archiveSHA256'] == asset.sha256,
   ) as Map;
@@ -92,7 +103,7 @@ class EngineRelease {
     'release': {
       'tag_name': tag,
       'draft': false,
-      'prerelease': false,
+      'prerelease': manifest['allowPrerelease'] == true,
       'assets': [
         {
           'name': asset.name,
@@ -121,21 +132,25 @@ class EngineRelease {
     Map manifest, {
     required String applicationVersion,
     required String platform,
+    Map<String, dynamic> policy = enginePolicy,
   }) {
-    if (!isStable(release) ||
-        release['tag_name'] != engineTag ||
-        manifest['cliContract'] != 2) {
+    if (!(isStable(release) ||
+            (policy["allowPrerelease"] == true &&
+                release["draft"] == false &&
+                release["prerelease"] == true)) ||
+        release['tag_name'] != policy['tag'] ||
+        manifest['cliContract'] != policy['cliContract']) {
       return null;
     }
     if (manifest['schemaVersion'] != 1 ||
-        manifest['cliContract'] != 2 ||
-        manifest['sourceRevision'] != engineSourceRevision) {
+        manifest['cliContract'] != policy['cliContract'] ||
+        manifest['sourceRevision'] != policy['sourceRevision']) {
       return null;
     }
     final app = AppVersion.parse(applicationVersion);
-    final minimum = AppVersion.parse(enginePolicy['minAppVersion'] as String);
+    final minimum = AppVersion.parse(policy['minAppVersion'] as String);
     final maximum = AppVersion.parse(
-      enginePolicy['maxAppVersionExclusive'] as String,
+      policy['maxAppVersionExclusive'] as String,
     );
     if (app == null || minimum == null || maximum == null) return null;
     if (minimum.compareTo(maximum) >= 0 ||
@@ -143,7 +158,7 @@ class EngineRelease {
         app.compareTo(maximum) >= 0) {
       return null;
     }
-    final name = engineAssetNames[platform];
+    final name = policy['assets'][platform] as String?;
     if (name == null ||
         manifest['assets'] is! Map ||
         manifest['assets'][platform] != name) {
@@ -156,17 +171,22 @@ class EngineRelease {
         .where((asset) => asset['name'] == name)
         .toList();
     if (matches.length != 1) return null;
-    final asset = EngineAsset.parse(matches.single, release['tag_name'], name);
-    if (asset?.sha256 != enginePolicy['packages'][platform]['archiveSHA256']) {
+    final asset = EngineAsset.parse(
+      matches.single,
+      release['tag_name'],
+      name,
+      repository: policy['repository'] as String,
+    );
+    if (asset?.sha256 != policy['packages'][platform]['archiveSHA256']) {
       return null;
     }
     return asset == null
         ? null
         : EngineRelease(
             release['tag_name'],
-            engineSourceRevision,
+            policy['sourceRevision'] as String,
             asset,
-            enginePolicy,
+            policy,
           );
   }
 }
