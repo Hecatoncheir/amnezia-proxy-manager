@@ -15,6 +15,8 @@ import '../engine/engine_view.dart';
 import '../engine/engine_panel.dart';
 import '../profiles/profiles_cubit.dart';
 import '../profiles/profiles_view.dart';
+import 'preparation_cubit.dart';
+import 'preparation_view.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key, this.engine, this.profiles, this.xray});
@@ -151,10 +153,13 @@ class _DashboardPageState extends State<DashboardPage> {
               if (widget.profiles != null &&
                   widget.engine != null &&
                   widget.xray != null)
-                _PreparationNotice(
-                  profiles: widget.profiles!,
-                  awg: widget.engine!,
-                  xray: widget.xray!,
+                BlocProvider(
+                  create: (_) => PreparationCubit(
+                    profiles: widget.profiles!,
+                    awg: widget.engine!,
+                    xray: widget.xray!,
+                  ),
+                  child: const PreparationView(),
                 ),
               const SizedBox(height: 16),
               const _TrafficCards(),
@@ -164,69 +169,6 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
     ),
   );
-}
-
-class _PreparationNotice extends StatelessWidget {
-  const _PreparationNotice({
-    required this.profiles,
-    required this.awg,
-    required this.xray,
-  });
-  final ProfilesCubit profiles;
-  final EngineManager awg, xray;
-
-  @override
-  Widget build(BuildContext context) =>
-      BlocBuilder<ProfilesCubit, ProfilesState>(
-        bloc: profiles,
-        builder: (context, profile) => BlocBuilder<EngineManager, EngineState>(
-          bloc: profile.requiredEngine == 'xray' ? xray : awg,
-          builder: (context, engine) {
-            final downloading = engine.status == EngineStatus.downloading;
-            final installing = engine.status == EngineStatus.installing;
-            final message = downloading
-                ? 'Скачиваем движок…'
-                : installing
-                ? 'Проверяем и устанавливаем движок…'
-                : profile.busy || profile.selected == null
-                ? profile.message
-                : null;
-            if (message == null) return const SizedBox.shrink();
-            return Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Row(
-                children: [
-                  if (downloading || installing) ...[
-                    SizedBox(
-                      width: 48,
-                      height: 48,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          SizedBox.expand(
-                            child: CircularProgressIndicator(
-                              value: downloading ? engine.progress : null,
-                            ),
-                          ),
-                          if (downloading)
-                            Text(
-                              '${(engine.progress * 100).floor()}%',
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
-                  Expanded(
-                    child: Text(message, style: const TextStyle(fontSize: 12)),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      );
 }
 
 class _Header extends StatelessWidget {
