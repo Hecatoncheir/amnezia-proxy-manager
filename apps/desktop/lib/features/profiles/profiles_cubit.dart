@@ -69,6 +69,42 @@ class ProfilesCubit extends Cubit<ProfilesState> {
   String _requiredEngine = 'awg';
   bool _locked = false;
   bool _loaded = false, _vaultReady = false, _busy = false;
+  List<int>? _detectedProfile;
+  bool get hasDetectedProfile => _detectedProfile != null;
+
+  Future<void> discoverLocal({Future<List<int>> Function()? reader}) async {
+    if (!_loaded || _busy || _records.isNotEmpty || !_vaultReady) return;
+    _busy = true;
+    _publish(busy: true, message: 'Ищем профиль AmneziaVPN…');
+    try {
+      final bytes = await (reader ?? readLocalAmneziaProfile)();
+      final imported = await codec.decode(bytes);
+      if (isClosed) return;
+      _detectedProfile = bytes;
+      _requiredEngine = imported.family;
+      _publish(
+        message: 'Найден профиль AmneziaVPN. Нажмите кнопку подключения — движок будет скачан автоматически.',
+      );
+    } catch (_) {
+      _publish(
+        message: 'Рабочий профиль AmneziaVPN не найден. Добавьте файл или ссылку в меню «Профили».',
+      );
+    } finally {
+      _busy = false;
+    }
+  }
+
+  Future<void> importDetected() async {
+    final bytes = _detectedProfile;
+    if (bytes == null || _records.isNotEmpty) return;
+    await importBytes(bytes, 'AmneziaVPN');
+    if (_selected == null) {
+      throw ProfileProblem(
+        state.message ?? 'Откройте меню «Профили», чтобы завершить импорт.',
+      );
+    }
+    _detectedProfile = null;
+  }
 
   Future<void> load() async {
     if (_busy || _loaded) return;
@@ -374,6 +410,7 @@ class ProfilesCubit extends Cubit<ProfilesState> {
 
   @override
   Future<void> close() async {
+    _detectedProfile = null;
     _pending = null;
     _records.clear();
     await super.close();

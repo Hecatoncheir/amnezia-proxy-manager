@@ -31,6 +31,7 @@ class ConnectionCubit extends Cubit<ProxyConnectionState> {
     required this.profiles,
     required this.awg,
     required this.xray,
+    this.prepare,
     SupervisorClient? client,
   }) : client = client ?? SupervisorClient(),
        super(const ProxyConnectionState(ConnectionStatus.disconnected)) {
@@ -38,6 +39,7 @@ class ConnectionCubit extends Cubit<ProxyConnectionState> {
   }
   final ProfilesCubit profiles;
   final EngineManager awg, xray;
+  final Future<void> Function()? prepare;
   final SupervisorClient client;
   late final StreamSubscription<Map<String, dynamic>> _subscription;
   var _generation = 0;
@@ -88,8 +90,16 @@ class ConnectionCubit extends Cubit<ProxyConnectionState> {
     _stopping = false;
     emit(const ProxyConnectionState(ConnectionStatus.starting));
     try {
+      await prepare?.call();
+      if (generation != _generation || _closed != null) return;
       await profiles.withSelectedForConnection((family, configuration) async {
         final engine = family == 'xray' ? xray : awg;
+        try {
+          await engine.ensureReady();
+        } catch (_) {
+          throw const SessionProblem('missing_engine');
+        }
+        if (generation != _generation || _closed != null) return;
         final store = EngineStore(
           await engine.directory(),
           policy: engine.policy,
@@ -163,7 +173,7 @@ class ConnectionCubit extends Cubit<ProxyConnectionState> {
 }
 
 String _message(Object? code) => switch (code) {
-  'missing_engine' => 'Скачайте движок в меню «Движки».',
+  'missing_engine' => 'Не удалось подготовить движок. Проверьте доступ к GitHub; повторить загрузку можно в меню «Движки».',
   'port_in_use' => 'Порт 1080 или 8080 занят другим приложением.',
   'untrusted_engine' => 'Движок не прошёл проверку. Скачайте его заново.',
   'invalid_config' =>

@@ -20,6 +20,13 @@ class EngineProfileValidator {
     final isXray = core.trimLeft().startsWith('{');
     final runtime = isXray ? xray : engine;
     if (runtime == null) throw const ProfileProblem('Движок Xray недоступен.');
+    try {
+      await runtime.ensureReady();
+    } catch (_) {
+      throw const ProfileProblem(
+        'Не удалось скачать или проверить движок. Проверьте доступ к GitHub и повторите попытку в меню «Движки».',
+      );
+    }
     final store = EngineStore(
       await runtime.directory(),
       policy: runtime.policy,

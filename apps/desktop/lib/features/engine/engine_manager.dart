@@ -63,6 +63,26 @@ class EngineManager extends Cubit<EngineState> {
   final Future<void> Function(File, String)? probe;
   bool _busy = false;
   EngineStore? _store;
+  Future<void>? _preparation;
+
+  /// Проверяем runtime и устанавливаем только разрешённый совместимый выпуск.
+  Future<void> ensureReady() =>
+      _preparation ??= _ensureReady().whenComplete(() {
+        _preparation = null;
+      });
+
+  Future<void> _ensureReady() async {
+    while (_busy && !isClosed) {
+      await Future<void>.delayed(const Duration(milliseconds: 25));
+    }
+    if (isClosed) throw StateError('Движок закрыт');
+    await check();
+    if (state.installed != null) return;
+    await download();
+    if (state.installed == null) {
+      throw StateError('Не удалось подготовить движок');
+    }
+  }
 
   Future<void> check() async {
     if (_busy || isClosed) return;

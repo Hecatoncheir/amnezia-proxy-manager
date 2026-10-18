@@ -110,6 +110,33 @@ void main() {
   });
 
   test(
+    'Автоподготовка объединяет запросы и отклоняет повреждённую загрузку',
+    () async {
+      var catalogs = 0, downloads = 0;
+      final engine = manager(
+        MockClient((request) async {
+          if (request.url.host == 'api.github.com') {
+            catalogs++;
+            return http.Response(jsonEncode([release()]), 200);
+          }
+          downloads++;
+          return http.Response.bytes([1, 2], 200);
+        }),
+      );
+      addTearDown(engine.close);
+      final first = engine.ensureReady();
+      final second = engine.ensureReady();
+      expect(identical(first, second), true);
+      await expectLater(first, throwsStateError);
+      expect(catalogs, 1);
+      expect(downloads, 1);
+      expect(engine.state.installed, isNull);
+      await expectLater(engine.ensureReady(), throwsStateError);
+      expect(downloads, 2);
+    },
+  );
+
+  test(
     'Процент обновляется по полученным байтам, затем начинается проверка',
     () async {
       const total = 4690621;
@@ -248,9 +275,7 @@ void main() {
     () async {
       final engine = manager(http.Client());
       addTearDown(engine.close);
-      await engine.check();
-      expect(engine.state.status, EngineStatus.available);
-      await engine.download();
+      await engine.ensureReady();
       expect(engine.state.status, EngineStatus.ready);
       final store = EngineStore(root);
       final restored = await store.installed('0.1.1', 'windows-x64');

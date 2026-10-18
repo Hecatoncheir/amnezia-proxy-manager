@@ -25,6 +25,68 @@ class MemoryVault implements ProfileVault {
 }
 
 void main() {
+  test('Автопоиск откладывает проверку и сохранение до подключения', () async {
+    final vault = MemoryVault();
+    var checks = 0;
+    final profiles = ProfilesCubit(
+      vault: vault,
+      validate: (_) async {
+        checks++;
+      },
+    );
+    addTearDown(profiles.close);
+    await profiles.load();
+    await profiles.discoverLocal(reader: () async => utf8.encode(testConf));
+    expect(vault.value, isNull);
+    expect(checks, 0);
+    expect(profiles.state.message, contains('Найден профиль'));
+    await profiles.importDetected();
+    expect(checks, 1);
+    expect(profiles.state.profiles.single.name, 'AmneziaVPN');
+    await profiles.discoverLocal(
+      reader: () async => throw StateError('Не читать'),
+    );
+    await profiles.importDetected();
+    expect(checks, 1);
+  });
+
+  test('Ошибка автопоиска оставляет ручной импорт доступным', () async {
+    final profiles = ProfilesCubit(
+      vault: MemoryVault(),
+      validate: (_) async {},
+    );
+    addTearDown(profiles.close);
+    await profiles.load();
+    await profiles.discoverLocal(
+      reader: () async => throw StateError(testPrivateKey),
+    );
+    expect(profiles.state.message, isNot(contains(testPrivateKey)));
+    await profiles.importBytes(utf8.encode(testConf), 'Вручную');
+    expect(profiles.state.profiles.single.name, 'Вручную');
+  });
+
+  test(
+    'Неудачная автоматическая проверка не сохраняет профиль и допускает повтор',
+    () async {
+      final vault = MemoryVault();
+      var fail = true;
+      final profiles = ProfilesCubit(
+        vault: vault,
+        validate: (_) async {
+          if (fail) throw StateError('ошибка');
+        },
+      );
+      addTearDown(profiles.close);
+      await profiles.load();
+      await profiles.discoverLocal(reader: () async => utf8.encode(testConf));
+      await expectLater(profiles.importDetected(), throwsA(isA<Exception>()));
+      expect(vault.value, isNull);
+      fail = false;
+      await profiles.importDetected();
+      expect(profiles.state.selected, isNotNull);
+    },
+  );
+
   test('Импорт проверяет движком до записи, восстановление, выбор и удаление ключей', () async {
     final vault = MemoryVault();
     var checks = 0;

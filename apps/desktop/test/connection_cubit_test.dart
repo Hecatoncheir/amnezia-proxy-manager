@@ -39,6 +39,15 @@ class FakeSupervisor extends SupervisorClient {
   }
 }
 
+class WaitingEngine extends EngineManager {
+  WaitingEngine(this.gate, Directory root) : super(directory: () async => root);
+  final Future<Directory> gate;
+  @override
+  Future<void> ensureReady() async {
+    await gate;
+  }
+}
+
 void main() {
   test('Без профиля кнопка возвращает понятную ошибку', () async {
     final p = ProfilesCubit(vault: MemoryVault(), validate: (_) async {});
@@ -64,8 +73,7 @@ void main() {
     final directory = await Directory.systemTemp.createTemp('m3-cancel');
     addTearDown(() => directory.delete(recursive: true));
     final gate = Completer<Directory>();
-    final awg = EngineManager(directory: () => gate.future),
-        xray = EngineManager();
+    final awg = WaitingEngine(gate.future, directory), xray = EngineManager();
     final p = ProfilesCubit(vault: MemoryVault(), validate: (_) async {});
     await p.load();
     await p.importBytes(utf8.encode(testConf), 'Тест');
