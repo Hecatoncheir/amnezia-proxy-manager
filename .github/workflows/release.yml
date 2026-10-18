@@ -126,13 +126,13 @@ jobs:
         shell: pwsh
         run: ./packaging/check-windows-update.ps1
       - name: Журналы установки Windows
-        if: always() && runner.os == 'Windows'
+        if: always() && runner.os == 'Windows' && env.WINDOWS_UPDATE_LOG_DIR != ''
         uses: actions/upload-artifact@v4
         with:
           name: windows-update-logs
           path: |
-            ${{ runner.temp }}/amnezia-update-check-*/*.log
-            ${{ runner.temp }}/amnezia-update-check-*/*.json
+            ${{ env.WINDOWS_UPDATE_LOG_DIR }}/*.log
+            ${{ env.WINDOWS_UPDATE_LOG_DIR }}/*.json
           if-no-files-found: warn
   publish:
     needs: [validate, build]

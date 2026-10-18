@@ -8,6 +8,7 @@ $journal = Join-Path $testRoot 'journal.json'
 $testId = 'AmneziaProxyManager.UpdateTest.' + [guid]::NewGuid()
 New-Item -ItemType Directory -Path $testRoot | Out-Null
 Write-Output "Журналы проверки: $testRoot"
+if ($env:GITHUB_ENV) { Add-Content -LiteralPath $env:GITHUB_ENV -Value "WINDOWS_UPDATE_LOG_DIR=$testRoot" }
 
 function Build-App([string]$Target) {
     Push-Location (Join-Path $root 'apps/desktop')
@@ -33,7 +34,7 @@ try {
     $probe = Join-Path $bundle 'amnezia_proxy_manager.exe'
     foreach ($mode in @('write', 'read')) {
         $report = Join-Path $testRoot "window-$mode.json"
-        $process = Start-Process -FilePath $probe -ArgumentList @($mode, "`"$report`"") -WindowStyle Hidden -PassThru
+        $process = Start-Process -FilePath $probe -ArgumentList @($mode, "`"$report`"") -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $testRoot "window-$mode.stdout.log") -RedirectStandardError (Join-Path $testRoot "window-$mode.stderr.log")
         if (!$process.WaitForExit(30000)) {
             Stop-Process -Id $process.Id
             throw 'Проверка положения окна зависла'
