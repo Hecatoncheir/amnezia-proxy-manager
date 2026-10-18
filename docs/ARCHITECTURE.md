@@ -2,7 +2,7 @@
 
 ## Границы
 
-Текущая реализация — UI и диагностический CLI; соединение между ними пока отсутствует. Целевая схема:
+Текущая реализация — UI, отдельная загрузка движка, импорт/системное хранение профилей и однократная проверка через Go CLI/stdin. Полное управление VPN через IPC ещё не реализовано. Целевая схема:
 
 В рабочем коде после v0.1.1 добавлены `features/engine`: проверка каталога upstream
 при запуске, подготовка отдельной загрузки и хранение проверенного runtime.
@@ -25,14 +25,15 @@ Upstream реализует сетевой стек; supervisor отвечает
 
 Текущий UI разделён на `main.dart`, `features/dashboard/dashboard_page.dart`, `settings/settings_cubit.dart` и `theme/gruvbox.dart`. Один `SettingsCubit<ThemeMode>` управляет темой; `BlocProvider` владеет его жизненным циклом. Простые карточки остаются обычными StatelessWidget, без искусственных событий и репозиториев. Данные сети пока не моделируются фиктивными состояниями.
 
-- Flutter presentation: темы, страницы, состояния. По мере реализации выделить features/profiles, features/connection, features/settings.
+- Flutter presentation: темы, страницы, состояния. features/profiles реализует импорт и хранилище M2; управление подключением ещё предстоит.
 - Dart engine client: планируемый запуск supervisor, JSON framing, таймауты и преобразование событий; бизнес-логика не в виджетах.
 - Go supervisor: планируемые IPC, machine state, безопасная передача профиля, управление дочерним процессом.
 - internal/upstream: существующий адаптер строит exec.Cmd с абсолютными путями (`--config`, `--silent`), очищает `WIREPROXY_*` из окружения; `ProxySections` создаёт только loopback-секции SOCKS5/HTTP. Профиль для запуска должен быть сгенерирован менеджером после строгого разбора M2. Он не проверяет происхождение binary, не читает профиль и не запускает процесс.
 - internal/upstream.VerifyBinary: отдельная проверка SHA-256 и Go build info
   загруженного backend; доступна через `proxy-engine --inspect-backend`, пока не
   связана с запуском туннеля. Вызывающий код M3 обязан выполнить её перед start.
-- Хранилище: планируемые метаданные в пользовательском каталоге и секреты в системном хранилище.
+- features/profiles: строгий разбор экспортов, закрытые записи с ключами, безопасные ProfileSummary для виджетов и системное хранилище; подробности в [PROFILES.md](PROFILES.md).
+- internal/validation: однократный --validate-config; чтение stdin, защищённый временный файл, ограниченный configtest без вывода upstream и очистка.
 
 Не вводить сервис с повышенными привилегиями без доказанной необходимости.
 
@@ -42,7 +43,7 @@ JSON Lines, UTF-8, protocolVersion=1; одна запись на строку, �
 
 Методы: capabilities, start(profileId, socksAddress, httpAddress), stop, status. Ошибки: invalid_profile, port_in_use, backend_unavailable, unsupported_version, timeout. Не передавать необработанный stderr upstream в UI.
 
-Сейчас доступен только однократный CLI --capabilities. Он не является реализацией описанного IPC.
+Сейчас доступны однократные --capabilities, --inspect-backend и --validate-config. Последняя команда принимает конфиг в stdin; это ещё не реализация описанного JSON Lines IPC.
 
 ## Состояния
 
@@ -77,7 +78,7 @@ disconnected → starting → running → stopping → disconnected; ошибк�
 
 Порты задаются в `[Socks5]` и `[http]`, а не флагами CLI. Веб-панель, daemon,
 SNI, входящие туннели и правила маршрутизации upstream не включаются менеджером.
-При будущем импорте M2 разрешать только необходимые поля `[Interface]`/`[Peer]`:
+В импорте M2 разрешены только необходимые поля `[Interface]`/`[Peer]`:
 исходный файл upstream не передавать напрямую. `WGConfig`, файловые ссылки,
 пользовательские секции и команды запрещены. В частности, whitelist-маршрутизация
 upstream способна направить несовпавший домен напрямую; приложение её не использует.

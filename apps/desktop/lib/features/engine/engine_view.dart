@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'engine_manager.dart';
+import 'download_ring.dart';
 
 class EngineView extends StatefulWidget {
   const EngineView({super.key, required this.manager});
@@ -42,10 +43,11 @@ class _EngineViewState extends State<EngineView> {
               ),
             ),
             const SizedBox(height: 8),
-            Text(_message(state)),
-            if (state.status == EngineStatus.downloading) ...[
+            if (state.status != EngineStatus.downloading) Text(_message(state)),
+            if (state.status == EngineStatus.downloading ||
+                state.status == EngineStatus.installing) ...[
               const SizedBox(height: 12),
-              LinearProgressIndicator(value: state.progress),
+              Center(child: DownloadRing(progress: state.progress)),
             ],
             if (state.status == EngineStatus.available) ...[
               const SizedBox(height: 12),
@@ -78,6 +80,8 @@ String _message(EngineState state) => switch (state.status) {
         ? 'Для подготовки приложения скачайте движок.'
         : 'Установлен ${state.installed!.tag}. Доступно обновление движка.',
   EngineStatus.downloading => 'Загрузка: ${(state.progress * 100).floor()}%',
+  EngineStatus.installing =>
+    'Загрузка завершена. Проверяем и устанавливаем движок…',
   EngineStatus.ready =>
     state.offline
         ? 'Движок ${state.installed!.tag} проверен. Проверка обновлений временно недоступна.'

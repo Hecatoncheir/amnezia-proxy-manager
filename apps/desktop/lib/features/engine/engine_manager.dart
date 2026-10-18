@@ -16,6 +16,7 @@ enum EngineStatus {
   unavailable,
   available,
   downloading,
+  installing,
   ready,
   failed,
 }
@@ -142,6 +143,14 @@ class EngineManager extends Cubit<EngineState> {
         await writer.close();
       }
       if (isClosed) return;
+      _publish(
+        EngineState(
+          EngineStatus.installing,
+          release: release,
+          installed: installed,
+          progress: 1,
+        ),
+      );
       await store.activate(partial, release, platform);
       _publish(
         EngineState(EngineStatus.ready, installed: release, release: release),

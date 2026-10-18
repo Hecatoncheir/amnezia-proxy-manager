@@ -6,27 +6,31 @@
 
 ## Текущее состояние
 
-Начальный каркас, версия 0.1.1. Есть нативные Flutter runners трёх ОС, переключение темы с анимацией, Go CLI диагностики, проверяемый адаптер аргументов upstream и CI. Импорт, IPC, запуск/остановка туннеля и упаковка движка **ещё не реализованы**. Кнопка подключения отключена; демонстрация не имитирует VPN.
+Опубликованная версия — 0.1.1; в рабочей версии добавлены отдельная загрузка движка, импорт AmneziaVPN/AmneziaWG, системное хранение ключей и проверка конфигурации. Есть Flutter runners трёх ОС, темы, установщики, обновление приложения и CI. IPC и запуск/остановка туннеля **ещё не реализованы**. Кнопка подключения отключена до M3.
 
-Сетевой движок — [bropines/awg-wireproxy](https://github.com/bropines/awg-wireproxy), проверенный выпуск **v2.1.0**, ревизия `02588433b6328171b594d76f3f16bd3404258a83`, лицензия ISC. Он загружается отдельно напрямую из GitHub Releases автора. Приложение при запуске предлагает последнюю проверенную совместимую версию, проверяет архив и бинарник по SHA-256, архитектуру и CLI, хранит runtime вне установки. Загрузка и повторный запуск без сети проверены на Windows. Подключение из UI появится после импорта профилей и управления процессом (M2–M3). Подробнее: [аудит M1](docs/UPSTREAM.md) · [схема загрузки движка](docs/ENGINE-RUNTIME.md).
+Сетевой движок — [bropines/awg-wireproxy](https://github.com/bropines/awg-wireproxy), проверенный выпуск **v2.1.0**, ревизия `02588433b6328171b594d76f3f16bd3404258a83`, лицензия ISC. Он загружается отдельно напрямую из GitHub Releases автора. Приложение при запуске предлагает последнюю проверенную совместимую версию, проверяет архив и бинарник по SHA-256, архитектуру и CLI, хранит runtime вне установки. Загрузка и повторный запуск без сети проверены на Windows. Импорт профилей и проверка конфигурации реализованы в M2; подключение из UI появится после управления процессом (M3). Подробнее: [аудит M1](docs/UPSTREAM.md) · [схема загрузки движка](docs/ENGINE-RUNTIME.md).
 
 ## Важные ограничения
 
 - Go proxy создаёт отдельный userspace-туннель, а не подключается к активному туннелю AmneziaVPN.
-- Поиск установленного приложения не даёт доступа к его защищённым профилям. Основной будущий сценарий — явный экспорт пользователем и импорт поддерживаемого профиля.
+- Поиск установленного приложения не даёт доступа к его защищённым профилям. Основной сценарий — явный экспорт пользователем и импорт поддерживаемого профиля. [Форматы и хранение ключей](docs/PROFILES.md).
 - Это не системный VPN и не системный kill switch. Проксируется только трафик приложений, настроенных на локальный прокси.
 - Совместимость экспорта, AmneziaWG-параметров, DNS и IPv6 предстоит проверять на реальных серверах. Повторное использование одного ключа одновременно двумя клиентами может вызвать конфликт.
 - Адреса по умолчанию: SOCKS5 `127.0.0.1:1080`, HTTP `127.0.0.1:8080`. Публикация в LAN не предусмотрена.
 
 ## Быстрый старт
 
-Требуются Flutter 3.47.7 / Dart 3.13.5 и Go 1.25+ (CI использует Go 1.27.0). Для Windows нужен Visual Studio с Desktop development with C++; для macOS — Xcode; для Linux — clang, CMake, Ninja, pkg-config, GTK 3 development, libstdc++ development.
+Требуются Flutter 3.47.7 / Dart 3.13.5 и Go 1.25+ (CI использует Go 1.27.0). Для Windows нужен Visual Studio с Desktop development with C++; для macOS — Xcode; для Linux — clang, CMake, Ninja, pkg-config, GTK 3 development, libstdc++ development, libsecret-1-dev; для хранения ключей требуется работающий Secret Service (например GNOME Keyring/KWallet). На Windows плагину хранилища также нужны C++ ATL libraries.
 
 ```sh
 cd apps/desktop
 flutter pub get
 flutter analyze
 flutter test
+flutter build windows --debug
+cd ../..
+python tools/build_supervisor.py
+cd apps/desktop
 flutter run -d windows
 # На соответствующей ОС: flutter run -d macos / flutter run -d linux
 ```
@@ -39,7 +43,7 @@ go run ./cmd/proxy-engine --capabilities
 go build -o ../build/proxy-engine ./cmd/proxy-engine
 ```
 
-На Windows используйте имя `proxy-engine.exe`. Команда `--capabilities` возвращает JSON с `canStart: false`; другие команды завершаются с кодом 2. Работающий VPN для этих проверок не требуется.
+На Windows используйте имя `proxy-engine.exe`. Команда `--capabilities` возвращает JSON с `canStart: false` и `canValidateConfig: true`; поддерживаются `--inspect-backend` и `--validate-config`. Работающий VPN для этих проверок не требуется.
 
 ## Структура
 
@@ -48,7 +52,8 @@ go build -o ../build/proxy-engine ./cmd/proxy-engine
 | apps/desktop/lib | Интерфейс и темы |
 | apps/desktop/windows, macos, linux | Нативные runners Flutter |
 | apps/desktop/test | Проверка состояния и переключения темы |
-| engine/cmd/proxy-engine | Диагностический Go CLI |
+| engine/cmd/proxy-engine | Диагностика и безопасная проверка профиля |
+| apps/desktop/lib/features/profiles | Импорт, метаданные, системное хранилище и проверка конфигурации |
 | engine/internal/upstream | Граница интеграции отдельно собранного backend |
 | docs/ARCHITECTURE.md | Компоненты, IPC, безопасность и платформы |
 | docs/UPSTREAM.md | Ревизия, стратегия интеграции и лицензирование |

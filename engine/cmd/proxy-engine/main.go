@@ -1,4 +1,4 @@
-// Каркас диагностики. Запуск туннеля ещё не реализован.
+// Диагностика и проверка профиля. Запуск туннеля ещё не реализован.
 package main
 
 import (
@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/upstream"
+	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/validation"
 )
 
 func main() {
@@ -18,6 +19,12 @@ func main() {
 }
 
 func run(args []string, output io.Writer) error {
+	if len(args) == 4 && args[0] == "--validate-config" && args[2] == "--sha256" {
+		if err := validation.Validate(args[1], args[3], os.Stdin); err != nil {
+			return err
+		}
+		return json.NewEncoder(output).Encode(map[string]any{"valid": true})
+	}
 	if len(args) == 4 && args[0] == "--inspect-backend" && args[2] == "--sha256" {
 		if err := upstream.VerifyBinary(args[1], args[3]); err != nil {
 			return err
@@ -27,11 +34,12 @@ func run(args []string, output io.Writer) error {
 		})
 	}
 	if len(args) != 1 || args[0] != "--capabilities" {
-		return fmt.Errorf("используйте --capabilities или --inspect-backend PATH --sha256 HASH; запуск туннеля недоступен")
+		return fmt.Errorf("используйте --capabilities, --inspect-backend или --validate-config PATH --sha256 HASH; запуск туннеля недоступен")
 	}
 	return json.NewEncoder(output).Encode(map[string]any{
 		"protocolVersion": 1, "status": "scaffold", "canStart": false,
 		"backend": "bropines/awg-wireproxy", "upstreamRevision": upstream.Revision,
 		"backendDistribution": "separate", "backendCliContract": 2,
+		"canValidateConfig": true,
 	})
 }

@@ -109,6 +109,47 @@ void main() {
     expect(engine.state.status, EngineStatus.unavailable);
   });
 
+  test(
+    'Процент обновляется по полученным байтам, затем начинается проверка',
+    () async {
+      const total = 4690621;
+      const chunk = 1024 * 1024;
+      final engine = manager(
+        MockClient.streaming((request, _) async {
+          if (request.url.host == 'api.github.com') {
+            return http.StreamedResponse(
+              Stream.value(utf8.encode(jsonEncode([release()]))),
+              200,
+            );
+          }
+          return http.StreamedResponse(
+            Stream.fromIterable([
+              List.filled(chunk, 0),
+              List.filled(chunk, 0),
+              List.filled(total - chunk * 2, 0),
+            ]),
+            200,
+            contentLength: total,
+          );
+        }),
+      );
+      addTearDown(engine.close);
+      final states = <EngineState>[];
+      final subscription = engine.stream.listen(states.add);
+      await engine.check();
+      await engine.download();
+      await subscription.cancel();
+      final percentages = states
+          .where((s) => s.status == EngineStatus.downloading)
+          .map((s) => (s.progress * 100).floor())
+          .toList();
+      expect(percentages, containsAllInOrder([0, 22, 44, 100]));
+      expect(states.any((s) => s.status == EngineStatus.installing), true);
+      // Синтетический поток не совпадает с закреплённым SHA-256 и не активируется.
+      expect(engine.state.status, EngineStatus.failed);
+    },
+  );
+
   test('Чужой сервер не запрашивается после перенаправления', () async {
     var calls = 0;
     final engine = manager(

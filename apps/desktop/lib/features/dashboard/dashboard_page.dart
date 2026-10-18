@@ -5,10 +5,13 @@ import '../../settings/settings_cubit.dart';
 import '../updates/updates_view.dart';
 import '../engine/engine_manager.dart';
 import '../engine/engine_view.dart';
+import '../profiles/profiles_cubit.dart';
+import '../profiles/profiles_view.dart';
 
 class DashboardPage extends StatelessWidget {
-  const DashboardPage({super.key, this.engine});
+  const DashboardPage({super.key, this.engine, this.profiles});
   final EngineManager? engine;
+  final ProfilesCubit? profiles;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -27,7 +30,10 @@ class DashboardPage extends StatelessWidget {
               ],
               const _ConnectionCard(),
               const SizedBox(height: 16),
-              const _ProfileCard(),
+              if (profiles != null)
+                ProfilesView(manager: profiles!)
+              else
+                const _ProfileCard(),
               const SizedBox(height: 16),
               const _TrafficCards(),
             ],
@@ -176,7 +182,7 @@ class _ConnectionCard extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             Tooltip(
-              message: 'Подключение станет доступно после интеграции движка и импорта профиля',
+              message: 'Подключение станет доступно после реализации управления VPN-процессом',
               child: FilledButton(
                 style: FilledButton.styleFrom(
                   disabledBackgroundColor: colors.primary.withValues(
