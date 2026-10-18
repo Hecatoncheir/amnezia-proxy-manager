@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui';
 
-const defaultWindowSize = Size(540, 840);
-const minimumWindowSize = Size(380, 560);
+const defaultWindowSize = Size(540, 540);
+const minimumWindowSize = Size(380, 480);
 
 class WindowGeometry {
   const WindowGeometry(this.bounds, {this.maximized = false});

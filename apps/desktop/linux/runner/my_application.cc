@@ -52,7 +52,7 @@ static void my_application_activate(GApplication* application) {
     gtk_window_set_title(window, "Amnezia Proxy");
   }
 
-  gtk_window_set_default_size(window, 540, 840);
+  gtk_window_set_default_size(window, 540, 540);
   g_autofree gchar* executable = g_file_read_link("/proc/self/exe", nullptr);
   if (executable != nullptr) {
     g_autofree gchar* directory = g_path_get_dirname(executable);

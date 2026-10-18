@@ -185,7 +185,13 @@ func socksDial(ctx context.Context, proxy, address string) (net.Conn, error) {
 			connection.Close()
 		}
 	}()
-	connection.SetDeadline(time.Now().Add(25 * time.Second))
+	deadline := time.Now().Add(25 * time.Second)
+	if limit, ok := ctx.Deadline(); ok && limit.Before(deadline) {
+		deadline = limit
+	}
+	connection.SetDeadline(deadline)
+	stopCancel := context.AfterFunc(ctx, func() { connection.Close() })
+	defer stopCancel()
 	if _, err = connection.Write([]byte{5, 1, 0}); err != nil {
 		return nil, err
 	}
@@ -234,4 +240,24 @@ func socksDial(ctx context.Context, proxy, address string) (net.Conn, error) {
 	}
 	success = true
 	return connection, nil
+}
+
+// CheckHTTPS подтверждает передачу данных, а не только открытый локальный порт.
+func CheckHTTPS(ctx context.Context, proxy string) error {
+	transport := &http.Transport{DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+		return socksDial(ctx, proxy, address)
+	}}
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Transport: transport}
+	request, _ := http.NewRequestWithContext(ctx, "GET", "https://example.com/", nil)
+	response, err := client.Do(request)
+	if err != nil {
+		return errors.New("network_unverified")
+	}
+	defer response.Body.Close()
+	if response.StatusCode != 200 {
+		return errors.New("network_unverified")
+	}
+	_, err = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
+	return err
 }

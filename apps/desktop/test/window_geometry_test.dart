@@ -7,7 +7,7 @@ void main() {
   const screen = Rect.fromLTWH(0, 0, 1920, 1040);
   test('Первый запуск: размер с примера, окно в центре рабочей области', () {
     final bounds = fitWindowToDisplays(null, [screen]);
-    expect(bounds.size, const Size(540, 840));
+    expect(bounds.size, const Size(540, 540));
     expect(bounds.center, screen.center);
   });
   test('Размер, координаты и развёрнутое состояние сохраняются', () {

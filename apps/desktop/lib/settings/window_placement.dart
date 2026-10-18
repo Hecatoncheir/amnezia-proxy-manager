@@ -16,6 +16,7 @@ class WindowPlacement with WindowListener {
     this.preferenceKey, [
     this._maximized = false,
   ]);
+  static Future<void> Function()? beforeClose;
   static const storageKey = 'window-placement-v1';
   static WindowPlacement? _active;
   static Future<void> flush() => _active?.save() ?? Future.value();
@@ -51,8 +52,8 @@ class WindowPlacement with WindowListener {
       WindowOptions(
         size: bounds.size,
         minimumSize: Size(
-          math.min(380, bounds.width),
-          math.min(560, bounds.height),
+          math.min(minimumWindowSize.width, bounds.width),
+          math.min(minimumWindowSize.height, bounds.height),
         ),
         title: 'Amnezia Proxy',
       ),
@@ -107,6 +108,7 @@ class WindowPlacement with WindowListener {
     if (_closing) return;
     _closing = true;
     _timer?.cancel();
+    if (beforeClose != null) await beforeClose!();
     await save();
     await windowManager.destroy();
   }

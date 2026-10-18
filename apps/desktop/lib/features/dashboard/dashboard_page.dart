@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../settings/settings_cubit.dart';
+import '../../settings/startup_cubit.dart';
+import '../../settings/window_placement.dart';
+import '../connection/connection_cubit.dart';
 import '../updates/updates_view.dart';
 import '../engine/engine_manager.dart';
 import '../engine/engine_view.dart';
@@ -22,20 +25,50 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
+  ConnectionCubit? _connection;
+  StartupCubit? _startup;
   @override
   void initState() {
     super.initState();
+    if (widget.engine != null &&
+        widget.xray != null &&
+        widget.profiles != null) {
+      _connection = ConnectionCubit(
+        profiles: widget.profiles!,
+        awg: widget.engine!,
+        xray: widget.xray!,
+      );
+      WindowPlacement.beforeClose = _connection!.close;
+      _startup = StartupCubit();
+    }
     if (widget.engine != null) unawaited(widget.engine!.check());
     if (widget.xray != null) unawaited(widget.xray!.check());
-    if (widget.profiles != null) unawaited(widget.profiles!.load());
+    unawaited(_loadProfileAndStartup());
+  }
+
+  Future<void> _loadProfileAndStartup() async {
+    await Future.wait<void>([
+      if (widget.profiles != null) widget.profiles!.load(),
+      if (_startup != null) _startup!.load(),
+    ]);
+    if (mounted && _startup?.state.autoconnect == true) {
+      await _connection?.toggle();
+    }
   }
 
   @override
   void dispose() {
-    if (widget.engine != null) unawaited(widget.engine!.close());
-    if (widget.xray != null) unawaited(widget.xray!.close());
-    if (widget.profiles != null) unawaited(widget.profiles!.close());
+    WindowPlacement.beforeClose = null;
+    unawaited(_disposeManagers());
     super.dispose();
+  }
+
+  Future<void> _disposeManagers() async {
+    await _connection?.close();
+    await _startup?.close();
+    if (widget.engine != null) await widget.engine!.close();
+    if (widget.xray != null) await widget.xray!.close();
+    if (widget.profiles != null) await widget.profiles!.close();
   }
 
   void _openMenu(String section) {
@@ -62,7 +95,7 @@ class _DashboardPageState extends State<DashboardPage> {
       builder: (_) => section == 'settings'
           ? BlocProvider.value(
               value: context.read<SettingsCubit>(),
-              child: const _SettingsDialog(),
+              child: _SettingsDialog(startup: _startup),
             )
           : AlertDialog(
               title: Text(section == 'profiles' ? 'Профили' : 'Движки'),
@@ -91,7 +124,7 @@ class _DashboardPageState extends State<DashboardPage> {
             children: [
               _Header(onSelected: _openMenu),
               const SizedBox(height: 24),
-              const _ConnectionCard(),
+              _ConnectionCard(connection: _connection),
               const SizedBox(height: 16),
               const _TrafficCards(),
             ],
@@ -171,7 +204,8 @@ class _Header extends StatelessWidget {
 }
 
 class _SettingsDialog extends StatelessWidget {
-  const _SettingsDialog();
+  const _SettingsDialog({this.startup});
+  final StartupCubit? startup;
 
   @override
   Widget build(BuildContext context) => AlertDialog(
@@ -191,6 +225,38 @@ class _SettingsDialog extends StatelessWidget {
                 onChanged: (_) => context.read<SettingsCubit>().toggleTheme(),
               ),
             ),
+            const Divider(height: 24),
+            if (startup != null)
+              BlocBuilder<StartupCubit, StartupOptions>(
+                bloc: startup,
+                builder: (context, state) => Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Автозапуск'),
+                      subtitle: const Text('При входе в систему'),
+                      value: state.autostart,
+                      onChanged: state.busy ? null : startup!.setAutostart,
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Автоподключение'),
+                      subtitle: const Text(
+                        'Подключать выбранный профиль при запуске приложения',
+                      ),
+                      value: state.autoconnect,
+                      onChanged: state.busy ? null : startup!.setAutoconnect,
+                    ),
+                    if (state.message != null)
+                      Text(
+                        state.message!,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                  ],
+                ),
+              ),
             const Divider(height: 32),
             const UpdatesView(),
           ],
@@ -207,10 +273,33 @@ class _SettingsDialog extends StatelessWidget {
 }
 
 class _ConnectionCard extends StatelessWidget {
-  const _ConnectionCard();
+  const _ConnectionCard({this.connection});
+  final ConnectionCubit? connection;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => connection == null
+      ? _content(
+          context,
+          const ProxyConnectionState(ConnectionStatus.disconnected),
+        )
+      : BlocBuilder<ConnectionCubit, ProxyConnectionState>(
+          bloc: connection,
+          builder: _content,
+        );
+
+  Widget _content(BuildContext context, ProxyConnectionState state) {
+    final running = state.status == ConnectionStatus.running;
+    final busy =
+        state.status == ConnectionStatus.starting ||
+        state.status == ConnectionStatus.stopping;
+    final label = switch (state.status) {
+      ConnectionStatus.disconnected => 'Отключено',
+      ConnectionStatus.starting => 'Подключение…',
+      ConnectionStatus.stopping => 'Отключение…',
+      ConnectionStatus.error => 'Не подключено',
+      ConnectionStatus.running =>
+        state.connectivity == 'verified' ? 'Подключено' : 'Прокси запущен',
+    };
     final colors = Theme.of(context).colorScheme;
     return Card(
       child: Padding(
@@ -229,8 +318,8 @@ class _ConnectionCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Отключено',
+                      Text(
+                        label,
                         style: TextStyle(
                           fontSize: 32,
                           fontWeight: FontWeight.w600,
@@ -246,22 +335,54 @@ class _ConnectionCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 IconButton.filled(
-                  tooltip: 'Подключение станет доступно после реализации управления VPN-процессом',
-                  onPressed: null,
+                  tooltip: running
+                      ? 'Отключить'
+                      : state.status == ConnectionStatus.starting
+                      ? 'Отменить подключение'
+                      : 'Подключить',
+                  onPressed:
+                      connection == null ||
+                          state.status == ConnectionStatus.stopping
+                      ? null
+                      : connection!.toggle,
                   style: IconButton.styleFrom(
                     padding: const EdgeInsets.all(18),
                     disabledBackgroundColor: colors.onSurface.withValues(
                       alpha: 0.08,
                     ),
+                    foregroundColor: running
+                        ? colors.primary
+                        : Theme.of(context).brightness == Brightness.dark
+                        ? const Color(0xffc7785b)
+                        : const Color(0xffa34f38),
+                    backgroundColor: colors.onSurface.withValues(alpha: 0.08),
                     disabledForegroundColor:
                         Theme.of(context).brightness == Brightness.dark
                         ? const Color(0xffc7785b)
                         : const Color(0xffa34f38),
                   ),
-                  icon: const Icon(Icons.power_settings_new, size: 32),
+                  icon: busy
+                      ? const SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.power_settings_new, size: 32),
                 ),
               ],
             ),
+            if (state.message != null || running) ...[
+              const SizedBox(height: 12),
+              Text(
+                state.message ??
+                    switch (state.connectivity) {
+                      'verified' => 'HTTPS через прокси проверен',
+                      'checking' => 'Проверяем доступ к сети…',
+                      _ => 'Локальный прокси работает. Доступ к сети не подтверждён.',
+                    },
+                style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+              ),
+            ],
           ],
         ),
       ),

@@ -1,4 +1,4 @@
-// Диагностика и проверка профиля. Запуск туннеля ещё не реализован.
+// Supervisor: управление сессией, диагностика и проверка профиля.
 package main
 
 import (
@@ -8,7 +8,9 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/autostart"
 	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/localprofile"
+	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/session"
 	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/upstream"
 	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/validation"
 )
@@ -21,6 +23,16 @@ func main() {
 }
 
 func run(args []string, output io.Writer) error {
+	if len(args) == 3 && args[0] == "--autostart" {
+		enabled, err := autostart.Apply(args[1], args[2])
+		if err != nil {
+			return fmt.Errorf("не удалось изменить автозапуск")
+		}
+		return json.NewEncoder(output).Encode(map[string]any{"enabled": enabled})
+	}
+	if len(args) == 1 && args[0] == "--ipc" {
+		return session.Serve(os.Stdin, output)
+	}
 	if len(args) == 4 && args[2] == "--sha256" && args[0] == "--probe-xray" {
 		if err := validation.ProbeXray(args[1], args[3], os.Stdin); err != nil {
 			return err
@@ -57,10 +69,10 @@ func run(args []string, output io.Writer) error {
 		})
 	}
 	if len(args) != 1 || args[0] != "--capabilities" {
-		return fmt.Errorf("используйте --capabilities, --inspect-backend или --validate-config PATH --sha256 HASH; запуск туннеля недоступен")
+		return fmt.Errorf("используйте --capabilities, --inspect-backend или --validate-config PATH --sha256 HASH или --ipc")
 	}
 	return json.NewEncoder(output).Encode(map[string]any{
-		"protocolVersion": 1, "status": "scaffold", "canStart": false,
+		"protocolVersion": 1, "status": "ready", "canStart": true,
 		"backend": "bropines/awg-wireproxy", "upstreamRevision": upstream.Revision,
 		"backendDistribution": "separate", "backendCliContract": 2,
 		"canValidateConfig": true, "canValidateXray": true, "canImportLocalAmnezia": runtime.GOOS == "windows",

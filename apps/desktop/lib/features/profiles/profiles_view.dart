@@ -128,7 +128,8 @@ class _ProfilesViewState extends State<ProfilesView> {
                 ),
                 PopupMenuButton<String>(
                   tooltip: 'Добавить профиль',
-                  enabled: !state.busy && !state.offerTemporary,
+                  enabled:
+                      !state.busy && !state.locked && !state.offerTemporary,
                   onSelected: (action) {
                     if (action == 'local') {
                       widget.manager.importLocal();
@@ -234,7 +235,8 @@ class _ProfilesViewState extends State<ProfilesView> {
                             ),
                           )
                           .toList(),
-                      onChanged: state.busy || state.offerTemporary
+                      onChanged:
+                          state.busy || state.locked || state.offerTemporary
                           ? null
                           : (id) {
                               if (id != null) widget.manager.select(id);
@@ -245,6 +247,7 @@ class _ProfilesViewState extends State<ProfilesView> {
                     tooltip: 'Действия с профилем',
                     enabled:
                         !state.busy &&
+                        !state.locked &&
                         !state.offerTemporary &&
                         state.selected != null,
                     icon: const Icon(Icons.more_vert),

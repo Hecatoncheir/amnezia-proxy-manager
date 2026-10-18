@@ -22,8 +22,10 @@ class ProfilesState {
     this.message,
     this.offerTemporary = false,
     this.requiredEngine = 'awg',
+    this.locked = false,
   });
   final String requiredEngine;
+  final bool locked;
   final List<ProfileSummary> profiles;
   final String? selected, message;
   final bool busy, offerTemporary;
@@ -65,6 +67,7 @@ class ProfilesCubit extends Cubit<ProfilesState> {
   String? _selected;
   String? _snapshot;
   String _requiredEngine = 'awg';
+  bool _locked = false;
   bool _loaded = false, _vaultReady = false, _busy = false;
 
   Future<void> load() async {
@@ -130,8 +133,29 @@ class ProfilesCubit extends Cubit<ProfilesState> {
         : 'awg';
   }
 
+  void lockForConnection(bool locked) {
+    _locked = locked;
+    _publish();
+  }
+
+  Future<void> withSelectedForConnection(
+    Future<void> Function(String, String) action,
+  ) async {
+    if (!_loaded || _busy || _pending != null || _locked) {
+      throw const ProfileProblem('Дождитесь завершения работы с профилями.');
+    }
+    final record = _records.where((r) => r.id == _selected).firstOrNull;
+    if (record == null) {
+      throw const ProfileProblem(
+        'Добавьте и выберите профиль в меню «Профили».',
+      );
+    }
+    lockForConnection(true);
+    await action(record.summary.family, record.configuration);
+  }
+
   Future<void> importLocal({Future<List<int>> Function()? reader}) async {
-    if (_busy || !_loaded || _pending != null) return;
+    if (_busy || _locked || !_loaded || _pending != null) return;
     _busy = true;
     _publish(busy: true, message: 'Читаем выбранный профиль AmneziaVPN…');
     try {
@@ -149,7 +173,7 @@ class ProfilesCubit extends Cubit<ProfilesState> {
   }
 
   Future<void> importBytes(List<int> bytes, String name) async {
-    if (_busy || !_loaded || _pending != null) return;
+    if (_busy || _locked || !_loaded || _pending != null) return;
     _busy = true;
     _publish(busy: true, message: 'Проверяем конфигурацию через движок…');
     try {
@@ -238,7 +262,12 @@ class ProfilesCubit extends Cubit<ProfilesState> {
   }
 
   Future<void> select(String id) async {
-    if (_busy || _pending != null || !_records.any((e) => e.id == id)) return;
+    if (_busy ||
+        _locked ||
+        _pending != null ||
+        !_records.any((e) => e.id == id)) {
+      return;
+    }
     _busy = true;
     try {
       if (_vaultReady) await _persist(_records, id);
@@ -255,7 +284,7 @@ class ProfilesCubit extends Cubit<ProfilesState> {
   }
 
   Future<void> checkSelected() async {
-    if (_busy || _pending != null) return;
+    if (_busy || _locked || _pending != null) return;
     final record = _records.where((e) => e.id == _selected).firstOrNull;
     if (record == null) return;
     _busy = true;
@@ -276,7 +305,7 @@ class ProfilesCubit extends Cubit<ProfilesState> {
   }
 
   Future<void> remove(String id) async {
-    if (_busy || _pending != null) return;
+    if (_busy || _locked || _pending != null) return;
     final record = _records.where((e) => e.id == id).firstOrNull;
     if (record == null) return;
     _busy = true;
@@ -332,6 +361,7 @@ class ProfilesCubit extends Cubit<ProfilesState> {
       emit(
         ProfilesState(
           requiredEngine: _requiredEngine,
+          locked: _locked,
           profiles: List.unmodifiable(_records.map((e) => e.summary)),
           selected: _selected,
           busy: busy,
