@@ -89,6 +89,8 @@ class WindowPlacement with WindowListener {
   Future<void> save() {
     _writes = _writes
         .then((_) async {
+          // Скрытое окно не должно заменять сохранённое видимое состояние.
+          if (!await windowManager.isVisible()) return;
           final minimized = await windowManager.isMinimized();
           final maximized = minimized
               ? _maximized
