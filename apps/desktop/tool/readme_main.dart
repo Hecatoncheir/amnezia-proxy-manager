@@ -26,7 +26,13 @@ class _DemoVault implements ProfileVault {
 }
 
 Future<void> main() async {
-  enableFlutterDriverExtension();
+  enableFlutterDriverExtension(
+    handler: (message) async {
+      final height = message == 'settings-window' ? 780.0 : 640.0;
+      await windowManager.setSize(Size(640, height));
+      return 'ok';
+    },
+  );
   // Изолируем демонстрационный запуск от настроек установленного приложения.
   // ignore: invalid_use_of_visible_for_testing_member
   SharedPreferences.setMockInitialValues({});

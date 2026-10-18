@@ -51,9 +51,11 @@ Future<void> main(List<String> args) async {
     );
     await shot('09-profile-checked');
     await tap(find.text('Готово'));
+    await driver.requestData('settings-window');
     await section('Настройки');
     await shot('08-settings');
     await tap(find.text('Готово'));
+    await driver.requestData('default-window');
   } finally {
     await driver.close();
   }

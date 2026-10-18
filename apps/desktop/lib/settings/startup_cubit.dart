@@ -67,7 +67,7 @@ class StartupCubit extends Cubit<StartupOptions> {
     _publish(busy: true);
     try {
       await _writeStartInTray(enabled);
-      _publish(autostart: enabled ? true : null, startInTray: enabled);
+      _publish(startInTray: enabled);
     } catch (_) {
       _publish(
         message: 'Не удалось настроить автозапуск в трей. Повторите попытку.',
@@ -88,6 +88,7 @@ class StartupCubit extends Cubit<StartupOptions> {
 
   Future<void> _enableAutostart() async {
     if (!await _command('enable')) throw const FormatException();
+    _publish(autostart: true, busy: true);
   }
 
   Future<void> setAutostart(bool enabled) async {

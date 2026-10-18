@@ -4,6 +4,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -24,5 +25,23 @@ func TestWindowsRunKey(t *testing.T) {
 	}
 	if _, err := Apply("enable", "relative.exe"); err == nil {
 		t.Fatal("принят относительный путь")
+	}
+	key, _, err := registry.CreateKey(registry.CURRENT_USER, path, registry.ALL_ACCESS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer key.Close()
+	if err := key.SetStringValue(valueName, `"`+binary+`"`); err != nil {
+		t.Fatal(err)
+	}
+	if enabled, err := runKey("status", binary, path, valueName); err != nil || !enabled {
+		t.Fatal("не распознана старая запись", err)
+	}
+	if _, err := runKey("enable", binary, path, valueName); err != nil {
+		t.Fatal(err)
+	}
+	command, _, err := key.GetStringValue(valueName)
+	if err != nil || !strings.HasSuffix(command, " --autostart") {
+		t.Fatal("нет признака автозапуска", err)
 	}
 }
