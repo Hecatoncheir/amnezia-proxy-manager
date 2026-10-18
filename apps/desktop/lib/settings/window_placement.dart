@@ -22,6 +22,8 @@ class WindowPlacement with WindowListener {
   static Future<void> show() async {
     if (await windowManager.isMinimized()) await windowManager.restore();
     await windowManager.show();
+    // Windows может подавить первый показ при запуске скрытым ярлыком.
+    if (!await windowManager.isVisible()) await windowManager.show();
     if (_active?._maximized == true) await windowManager.maximize();
     await windowManager.focus();
   }

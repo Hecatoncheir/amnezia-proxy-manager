@@ -10,10 +10,10 @@ import 'package:window_manager/window_manager.dart';
 Future<void> main(List<String> arguments) async {
   try {
     await _probe(arguments);
-  } catch (_) {
+  } catch (error) {
     if (arguments.length > 1) {
       await File('${arguments[1]}.error.json')
-          .writeAsString(jsonEncode({'error': 'window_geometry_failed'}));
+          .writeAsString(jsonEncode({'error': error.toString()}));
     }
     exit(2);
   }
@@ -21,8 +21,14 @@ Future<void> main(List<String> arguments) async {
 
 Future<void> _probe(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
-  await WindowPlacement.initialize(preferenceKey: 'window-placement-probe-v2');
+  await WindowPlacement.initialize(
+    preferenceKey: 'window-placement-probe-v2',
+    showWindow: false,
+  );
   runApp(const SizedBox());
+  await WindowPlacement.show();
+  await WidgetsBinding.instance.endOfFrame;
+  await _waitUntilVisible();
   if (arguments.first == 'write') {
     final current = await windowManager.getBounds();
     await windowManager.setBounds(
@@ -49,4 +55,14 @@ Future<void> _probe(List<String> arguments) async {
     }),
   );
   await windowManager.close();
+}
+
+Future<void> _waitUntilVisible() async {
+  final deadline = DateTime.now().add(const Duration(seconds: 5));
+  while (!await windowManager.isVisible()) {
+    if (DateTime.now().isAfter(deadline)) {
+      throw StateError('Окно не появилось');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+  }
 }
