@@ -116,30 +116,42 @@ class _UpdatesViewState extends State<UpdatesView> {
 
   List<Widget> _installPrompt() => [
     if (_confirmInstall) ...[
-      const SizedBox(height: 16),
-      const Text(
-        'Приложение закроется. Установщик обновит его и запустит снова.',
-      ),
-      const SizedBox(height: 12),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          FilledButton(
-            onPressed: updates.installing
-                ? null
-                : () async {
-                    setState(() => _confirmInstall = false);
-                    await updates.install();
-                  },
-            child: const Text('Подтвердить установку'),
+      const SizedBox(height: 24),
+      Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            spacing: 16,
+            children: [
+              const Text(
+                'Приложение закроется. Установщик обновит его и запустит снова.',
+              ),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  FilledButton(
+                    onPressed: updates.installing
+                        ? null
+                        : () async {
+                            setState(() => _confirmInstall = false);
+                            await updates.install();
+                          },
+                    child: const Text('Подтвердить установку'),
+                  ),
+                  TextButton(
+                    onPressed: () => setState(() => _confirmInstall = false),
+                    child: const Text('Отмена'),
+                  ),
+                ],
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => setState(() => _confirmInstall = false),
-            child: const Text('Отмена'),
-          ),
-        ],
+        ),
       ),
+      const SizedBox(height: 8),
     ],
   ];
 
