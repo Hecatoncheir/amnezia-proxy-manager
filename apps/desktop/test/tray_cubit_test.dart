@@ -24,6 +24,41 @@ class TestTray implements AppTray {
 }
 
 void main() {
+  test('Сворачивание по настройке не завершает приложение, выход из трея завершает', () async {
+    final tray = TestTray();
+    var hidden = 0, exited = 0;
+    final cubit = TrayCubit(
+      tray: tray,
+      showWindow: () async {},
+      hideWindow: () async {
+        hidden++;
+      },
+      exitApplication: () async {
+        exited++;
+      },
+    );
+    await cubit.start();
+    expect(await cubit.minimizeIfEnabled(false), false);
+    expect(hidden, 0);
+    expect(await cubit.minimizeIfEnabled(true), true);
+    expect(hidden, 1);
+    expect(exited, 0);
+    await tray.exitApp();
+    expect(exited, 1);
+    await cubit.close();
+  });
+
+  test('Недоступный трей не поглощает сворачивание и закрытие окна', () async {
+    final tray = TestTray()..available = false;
+    final cubit = TrayCubit(
+      tray: tray,
+      showWindow: () async {},
+      hideWindow: () async => fail('Window must not be hidden'),
+    );
+    await cubit.start();
+    expect(await cubit.minimizeIfEnabled(true), false);
+    await cubit.close();
+  });
   test('Скрытый запуск, открытие и выход через трей', () async {
     final tray = TestTray();
     var shown = 0, hidden = 0, exited = 0;

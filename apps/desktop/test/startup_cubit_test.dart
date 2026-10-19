@@ -3,6 +3,29 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:amnezia_proxy_manager/settings/startup_cubit.dart';
 
 void main() {
+  test('Сворачивание в трей сохраняется отдельно от автозапуска', () async {
+    SharedPreferences.setMockInitialValues({});
+    final calls = <String>[];
+    final first = StartupCubit(
+      autostartCommand: (action) async {
+        calls.add(action);
+        return false;
+      },
+    );
+    await first.load();
+    expect(first.state.minimizeToTray, false);
+    await first.setMinimizeToTray(true);
+    expect(first.state.autostart, false);
+    expect(first.state.startInTray, false);
+    expect(calls, ['status']);
+    await first.close();
+    final next = StartupCubit(autostartCommand: (_) async => false);
+    await next.load();
+    expect(next.state.minimizeToTray, true);
+    await next.setMinimizeToTray(false);
+    expect(next.state.minimizeToTray, false);
+    await next.close();
+  });
   test(
     'Запуск в трей сохраняется, включает автозапуск и отличается от ярлыка',
     () async {

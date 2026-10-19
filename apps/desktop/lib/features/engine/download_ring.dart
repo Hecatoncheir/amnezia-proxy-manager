@@ -3,8 +3,13 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 class DownloadRing extends StatelessWidget {
-  const DownloadRing({super.key, required this.progress});
+  const DownloadRing({
+    super.key,
+    required this.progress,
+    this.label = 'Загрузка движка',
+  });
   final double progress;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -12,7 +17,7 @@ class DownloadRing extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final percent = '${(value * 100).floor()}%';
     return Semantics(
-      label: 'Загрузка движка',
+      label: label,
       value: percent,
       child: ExcludeSemantics(
         child: SizedBox.square(

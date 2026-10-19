@@ -18,6 +18,7 @@ class WindowPlacement with WindowListener {
   ]);
   static Future<void> Function()? beforeClose;
   static Future<void> Function()? afterClose;
+  static Future<bool> Function()? tryHideToTray;
   static Future<void> quit() async => _active?.close();
   static Future<void> show() async {
     if (await windowManager.isMinimized()) await windowManager.restore();
@@ -121,7 +122,20 @@ class WindowPlacement with WindowListener {
   @override
   void onWindowUnmaximize() => scheduleSave();
   @override
-  void onWindowClose() => unawaited(close());
+  void onWindowClose() => unawaited(requestClose());
+  @override
+  void onWindowMinimize() => unawaited(_minimize());
+
+  Future<void> _minimize() async {
+    if (_closing) return;
+    await tryHideToTray?.call();
+  }
+
+  Future<void> requestClose() async {
+    if (_closing) return;
+    if (await tryHideToTray?.call() == true) return;
+    await close();
+  }
 
   Future<void> close() async {
     if (_closing) return;

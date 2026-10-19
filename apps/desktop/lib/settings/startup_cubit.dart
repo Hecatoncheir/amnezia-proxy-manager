@@ -9,10 +9,11 @@ class StartupOptions {
     this.autostart = false,
     this.autoconnect = false,
     this.startInTray = false,
+    this.minimizeToTray = false,
     this.busy = false,
     this.message,
   });
-  final bool autostart, autoconnect, startInTray, busy;
+  final bool autostart, autoconnect, startInTray, minimizeToTray, busy;
   final String? message;
 }
 
@@ -23,6 +24,7 @@ class StartupCubit extends Cubit<StartupOptions> {
   SharedPreferences? preferences;
   static const autoConnectKey = 'auto-connect-v1';
   static const startInTrayKey = 'start-in-tray-v1';
+  static const minimizeToTrayKey = 'minimize-to-tray-v1';
   static bool shouldStartInTray(
     List<String> arguments,
     SharedPreferences preferences,
@@ -51,11 +53,34 @@ class StartupCubit extends Cubit<StartupOptions> {
       preferences ??= await SharedPreferences.getInstance();
       final autoconnect = preferences!.getBool(autoConnectKey) ?? false;
       final startInTray = preferences!.getBool(startInTrayKey) ?? false;
-      _publish(autoconnect: autoconnect, startInTray: startInTray, busy: true);
+      final minimizeToTray = preferences!.getBool(minimizeToTrayKey) ?? false;
+      _publish(
+        autoconnect: autoconnect,
+        startInTray: startInTray,
+        minimizeToTray: minimizeToTray,
+        busy: true,
+      );
       final enabled = await _command('status');
       _publish(autostart: enabled, autoconnect: autoconnect);
     } catch (_) {
       _publish(message: 'Не удалось проверить автозапуск.');
+    } finally {
+      _busy = false;
+    }
+  }
+
+  Future<void> setMinimizeToTray(bool enabled) async {
+    if (_busy) return;
+    _busy = true;
+    _publish(busy: true);
+    try {
+      preferences ??= await SharedPreferences.getInstance();
+      if (!await preferences!.setBool(minimizeToTrayKey, enabled)) {
+        throw const FormatException();
+      }
+      _publish(minimizeToTray: enabled);
+    } catch (_) {
+      _publish(message: 'Не удалось сохранить настройку сворачивания в трей.');
     } finally {
       _busy = false;
     }
@@ -129,6 +154,7 @@ class StartupCubit extends Cubit<StartupOptions> {
     bool? autostart,
     bool? autoconnect,
     bool? startInTray,
+    bool? minimizeToTray,
     bool busy = false,
     String? message,
   }) {
@@ -138,6 +164,7 @@ class StartupCubit extends Cubit<StartupOptions> {
           autostart: autostart ?? state.autostart,
           autoconnect: autoconnect ?? state.autoconnect,
           startInTray: startInTray ?? state.startInTray,
+          minimizeToTray: minimizeToTray ?? state.minimizeToTray,
           busy: busy,
           message: message,
         ),

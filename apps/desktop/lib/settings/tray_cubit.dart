@@ -57,6 +57,25 @@ class TrayCubit extends Cubit<TrayState> {
     if (!isClosed) emit(const TrayState(ready: true, hidden: true));
   }
 
+  Future<bool> minimizeIfEnabled(bool enabled) async {
+    if (!enabled || !state.ready) return false;
+    if (state.hidden) return true;
+    try {
+      await hide();
+    } catch (_) {
+      await open();
+      if (!isClosed) {
+        emit(
+          TrayState(
+            ready: state.ready,
+            message: 'Не удалось свернуть в трей. Окно оставлено открытым.',
+          ),
+        );
+      }
+    }
+    return true;
+  }
+
   @override
   Future<void> close() async {
     tray.dispose();

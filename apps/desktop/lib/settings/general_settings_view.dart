@@ -51,6 +51,13 @@ class GeneralSettingsView extends StatelessWidget {
       ),
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
+        title: const Text('Автозапуск свёрнутым в трей'),
+        subtitle: const Text('При входе в систему, без открытия окна'),
+        value: state.startInTray,
+        onChanged: state.busy ? null : startup!.setStartInTray,
+      ),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
         title: const Text('Автоподключение'),
         subtitle: const Text(
           'Подключать выбранный профиль при запуске приложения',
@@ -60,10 +67,12 @@ class GeneralSettingsView extends StatelessWidget {
       ),
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
-        title: const Text('Автозапуск свёрнутым в трей'),
-        subtitle: const Text('При входе в систему, без открытия окна'),
-        value: state.startInTray,
-        onChanged: state.busy ? null : startup!.setStartInTray,
+        title: const Text('Сворачивать в трей'),
+        subtitle: const Text(
+          'При сворачивании и закрытии окна. Для завершения работы выберите «Выход» в меню трея.',
+        ),
+        value: state.minimizeToTray,
+        onChanged: state.busy ? null : startup!.setMinimizeToTray,
       ),
       _message(state),
     ],

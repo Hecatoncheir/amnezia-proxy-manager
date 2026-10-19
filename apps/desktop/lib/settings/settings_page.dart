@@ -186,6 +186,7 @@ class _DiagnosticTile extends StatelessWidget {
   final DiagnosticStep step;
   @override
   Widget build(BuildContext context) => Card(
+    margin: const EdgeInsets.only(bottom: 12),
     child: ListTile(
       leading: step.status == CheckStatus.checking
           ? const SizedBox(
