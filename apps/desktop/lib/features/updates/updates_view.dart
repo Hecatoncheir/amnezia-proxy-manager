@@ -54,27 +54,9 @@ class _UpdatesViewState extends State<UpdatesView> {
     }
   }
 
+  bool _confirmInstall = false;
   Future<void> install() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Установить обновление?'),
-        content: const Text(
-          'Приложение закроется. Установщик обновит его и запустит снова.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Установить'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && mounted) await updates.install();
+    setState(() => _confirmInstall = true);
   }
 
   String get message => switch (updates.status) {
@@ -100,6 +82,30 @@ class _UpdatesViewState extends State<UpdatesView> {
         Text(message),
         const SizedBox(height: 12),
         actions(),
+        if (_confirmInstall) ...[
+          const SizedBox(height: 16),
+          const Text(
+            'Приложение закроется. Установщик обновит его и запустит снова.',
+          ),
+          Wrap(
+            spacing: 8,
+            children: [
+              FilledButton(
+                onPressed: updates.installing
+                    ? null
+                    : () async {
+                        setState(() => _confirmInstall = false);
+                        await updates.install();
+                      },
+                child: const Text('Подтвердить установку'),
+              ),
+              TextButton(
+                onPressed: () => setState(() => _confirmInstall = false),
+                child: const Text('Отмена'),
+              ),
+            ],
+          ),
+        ],
         if (updates.downloading) ...[
           const SizedBox(height: 12),
           LinearProgressIndicator(

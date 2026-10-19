@@ -33,30 +33,28 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Добавить профиль'));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('По ссылке'));
     await tester.pumpAndSettle();
     final field = find.byType(TextField).last;
     expect(tester.widget<TextField>(field).obscureText, true);
     await tester.enterText(field, vpnUri(exportJson()));
+    await tester.ensureVisible(find.text('Импортировать'));
     await tester.tap(find.text('Импортировать'));
     await tester.pumpAndSettle();
     expect(find.text('Профиль 1'), findsOneWidget);
     expect(find.textContaining(testPrivateKey), findsNothing);
-    await tester.tap(find.byTooltip('Действия с профилем'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Проверить'));
+    await tester.tap(find.text('Проверить профиль'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Конфигурация принята'), findsOneWidget);
-    await tester.tap(find.byTooltip('Действия с профилем'));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('Удалить из менеджера'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(TextButton, 'Удалить').last);
     await tester.pumpAndSettle();
     expect(vault.value, isNull);
-    expect(find.text('Добавьте профиль для подключения'), findsOneWidget);
+    expect(
+      find.text('Профилей пока нет. Добавьте первый ниже.'),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -85,8 +83,6 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('34%'), findsOneWidget);
-      await tester.tap(find.byTooltip('Добавить профиль'));
-      await tester.pumpAndSettle();
       expect(find.text('Из файла'), findsOneWidget);
       expect(find.text('По ссылке'), findsOneWidget);
       expect(tester.takeException(), isNull);

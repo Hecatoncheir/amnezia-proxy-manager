@@ -25,12 +25,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(ProfilesView), findsNothing);
     for (var i = 0; i < 2; i++) {
-      await tester.tap(find.byTooltip('Меню'));
+      await tester.tap(find.byTooltip('Настройки'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Профили'));
       await tester.pumpAndSettle();
-      expect(find.text('Добавить'), findsOneWidget);
-      await tester.tap(find.text('Готово'));
+      expect(find.text('Добавить профиль'), findsOneWidget);
+      await tester.tap(find.byTooltip('Назад'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Назад'));
       await tester.pumpAndSettle();
       expect(profiles.isClosed, isFalse);
       expect(find.byType(ProfilesView), findsNothing);
@@ -61,13 +63,15 @@ void main() {
       isNull,
     );
     expect(find.text('— КБ/с'), findsNWidgets(2));
-    await tester.tap(find.byTooltip('Меню'));
+    await tester.tap(find.byTooltip('Настройки'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Настройки'));
+    await tester.tap(find.text('Общие'));
     await tester.pumpAndSettle();
     await tester.tap(find.byType(SwitchListTile));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Готово'));
+    await tester.tap(find.byTooltip('Назад'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Назад'));
     await tester.pumpAndSettle();
     expect(
       Theme.of(tester.element(find.byType(Scaffold))).brightness,
@@ -99,11 +103,13 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await tester.pumpWidget(const ProxyManagerApp());
-    await tester.tap(find.byTooltip('Меню'));
+    await tester.tap(find.byTooltip('Настройки'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Настройки'));
+    await tester.tap(find.text('Общие'));
     await tester.pumpAndSettle();
-    expect(find.text('Проверить обновления'), findsOneWidget);
+    expect(find.text('Тёмная тема'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.byType(PopupMenuButton<String>), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

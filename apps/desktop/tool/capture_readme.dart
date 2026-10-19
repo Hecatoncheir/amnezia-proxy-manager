@@ -16,46 +16,45 @@ Future<void> main(List<String> args) async {
 
   Future<void> tap(SerializableFinder finder) =>
       driver.tap(finder, timeout: const Duration(seconds: 10));
-  Future<void> section(String title) async {
-    await tap(find.byTooltip('Меню'));
-    await tap(find.text(title));
-  }
-
+  Future<void> back() => tap(find.byTooltip('Назад'));
   try {
-    await driver.waitFor(find.byTooltip('Подключить'));
-    await shot('01-main');
-    await tap(find.byTooltip('Меню'));
-    await shot('02-menu');
-    await tap(find.text('Движки'));
-    await driver.waitFor(
-      find.text('Готов к работе · v26.7.28'),
-      timeout: const Duration(seconds: 60),
-    );
-    await shot('03-engine');
-    await tap(find.text('Готово'));
-    await section('Профили');
-    await driver.waitFor(find.text('Мой профиль'));
-    await shot('04-profiles');
-    await tap(find.byTooltip('Добавить профиль'));
-    await shot('05-import-menu');
-    await tap(find.text('По ссылке'));
-    await shot('06-import-link');
-    await tap(find.text('Отмена'));
-    await tap(find.byTooltip('Действия с профилем'));
-    await shot('07-profile-actions');
-    await tap(find.text('Проверить'));
-    await driver.waitFor(
-      find.text(
-        'Конфигурация принята движком. VPN-подключение не запускалось.',
-      ),
-    );
-    await shot('09-profile-checked');
-    await tap(find.text('Готово'));
-    await driver.requestData('settings-window');
-    await section('Настройки');
-    await shot('08-settings');
-    await tap(find.text('Готово'));
-    await driver.requestData('default-window');
+    await driver.runUnsynchronized(() async {
+      await driver.waitFor(find.byTooltip('Подключить'));
+      await shot('01-main');
+      await tap(find.byTooltip('Настройки'));
+      await shot('02-menu');
+      await tap(find.text('Движки'));
+      await shot('03-engine');
+      await back();
+      await tap(find.text('Профили'));
+      await driver.waitFor(find.text('Мой профиль'));
+      await shot('04-profiles');
+      await tap(find.text('Из файла'));
+      await shot('05-import-menu');
+      await tap(find.text('Отмена'));
+      await tap(find.text('По ссылке'));
+      await shot('06-import-link');
+      await tap(find.text('Отмена'));
+      await tap(find.text('Удалить из менеджера'));
+      await shot('07-profile-actions');
+      await tap(find.text('Отмена'));
+      await tap(find.text('Проверить профиль'));
+      await driver.waitFor(
+        find.text(
+          'Конфигурация принята движком. VPN-подключение не запускалось.',
+        ),
+        timeout: const Duration(seconds: 40),
+      );
+      await shot('09-profile-checked');
+      await back();
+      await tap(find.text('Общие'));
+      await shot('08-settings');
+      await back();
+      await tap(find.text('Диагностика'));
+      await shot('10-diagnostics');
+      await back();
+      await back();
+    });
   } finally {
     await driver.close();
   }

@@ -84,6 +84,7 @@ class SupervisorClient {
                 'unsupported_engine',
                 'stop_timeout',
                 'invalid_ports',
+                'not_running',
               };
               completer.completeError(
                 SessionProblem(
@@ -173,6 +174,10 @@ class SupervisorClient {
       'socksPort': socksPort,
       'httpPort': httpPort,
     });
+  }
+
+  Future<void> check() async {
+    await _request('check');
   }
 
   Future<void> stop() async {

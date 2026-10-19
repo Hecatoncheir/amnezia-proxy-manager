@@ -18,10 +18,12 @@ class ProxyConnectionState {
     this.status, {
     this.connectivity = '',
     this.message,
+    this.code,
   });
   final ConnectionStatus status;
   final String connectivity;
   final String? message;
+  final String? code;
   bool get active =>
       status == ConnectionStatus.starting ||
       status == ConnectionStatus.running ||
@@ -45,6 +47,7 @@ class ConnectionCubit extends Cubit<ProxyConnectionState> {
   final Future<void> Function()? prepare;
   final Future<ProxyPorts> Function()? readPorts;
   final SupervisorClient client;
+  bool diagnosing = false;
   late final StreamSubscription<Map<String, dynamic>> _subscription;
   var _generation = 0;
   var _stopping = false;
@@ -69,6 +72,7 @@ class ConnectionCubit extends Cubit<ProxyConnectionState> {
     emit(
       ProxyConnectionState(
         status,
+        code: value['code'] as String?,
         connectivity:
             const {
               'checking',
@@ -130,6 +134,7 @@ class ConnectionCubit extends Cubit<ProxyConnectionState> {
         emit(
           ProxyConnectionState(
             ConnectionStatus.error,
+            code: error is SessionProblem ? error.code : 'preparation_failed',
             message: error is ProfileProblem
                 ? error.message
                 : _message(error is SessionProblem ? error.code : 'ipc_failed'),
@@ -144,6 +149,21 @@ class ConnectionCubit extends Cubit<ProxyConnectionState> {
       return await readPorts?.call() ?? const ProxyPorts();
     } on FormatException catch (error) {
       throw ProfileProblem(error.message);
+    }
+  }
+
+  Future<void> checkNetwork() async {
+    if (state.status != ConnectionStatus.running) return;
+    emit(
+      const ProxyConnectionState(
+        ConnectionStatus.running,
+        connectivity: 'checking',
+      ),
+    );
+    try {
+      await client.check();
+    } catch (_) {
+      /* Потерю IPC обработает поток событий. */
     }
   }
 
@@ -188,7 +208,7 @@ class ConnectionCubit extends Cubit<ProxyConnectionState> {
 }
 
 String _message(Object? code) => switch (code) {
-  'missing_engine' => 'Не удалось подготовить движок. Проверьте доступ к GitHub; повторить загрузку можно в меню «Движки».',
+  'missing_engine' => 'Не удалось подготовить движок. Проверьте доступ к GitHub; повторить загрузку можно в настройках движков.',
   'port_in_use' => 'Не удалось открыть выбранные порты: они заняты или недоступны. Измените порты на главном экране.',
   'invalid_ports' => 'Укажите разные порты SOCKS5 и HTTP от 1 до 65535.',
   'unsupported_ports' =>

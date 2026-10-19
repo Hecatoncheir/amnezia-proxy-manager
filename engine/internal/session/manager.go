@@ -34,14 +34,16 @@ type Request struct {
 	HTTPPort      *int   `json:"httpPort,omitempty"`
 }
 type State struct {
-	Status       string `json:"status"`
-	Connectivity string `json:"connectivity,omitempty"`
-	Code         string `json:"code,omitempty"`
+	Status       string   `json:"status"`
+	Connectivity string   `json:"connectivity,omitempty"`
+	Code         string   `json:"code,omitempty"`
+	Traffic      *Traffic `json:"traffic,omitempty"`
 }
 type running struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	done   chan struct{}
+	ctx     context.Context
+	cancel  context.CancelFunc
+	done    chan struct{}
+	recheck chan struct{}
 }
 type Manager struct {
 	mu          sync.Mutex
@@ -95,7 +97,7 @@ func (m *Manager) Start(r Request) error {
 		return err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	s := &running{ctx: ctx, cancel: cancel, done: make(chan struct{})}
+	s := &running{ctx: ctx, cancel: cancel, done: make(chan struct{}), recheck: make(chan struct{}, 1)}
 	m.active = s
 	m.state = State{Status: "starting"}
 	if m.publish != nil {
@@ -162,7 +164,14 @@ func (m *Manager) run(s *running, r Request) {
 		code = "untrusted_engine"
 		return
 	}
-	config, err := configuration(r, m.socks, m.http)
+	relay, err := newRelays(m.socks, m.http)
+	if err != nil {
+		code = "port_in_use"
+		return
+	}
+	defer func() { relay.close(); m.reportTraffic(relay) }()
+	backendSocks, backendHTTP := relay.addresses()
+	config, err := configuration(r, backendSocks, backendHTTP)
 	r.Configuration = ""
 	if err != nil {
 		code = "invalid_config"
@@ -173,24 +182,6 @@ func (m *Manager) run(s *running, r Request) {
 		code = "stopped"
 		return
 	}
-	// Проверяем оба порта до запуска, не принимаем чужой listener за готовность.
-	reservations := []net.Listener{}
-	for _, address := range []string{m.socks, m.http} {
-		listener, err := net.Listen("tcp", address)
-		if err != nil {
-			for _, l := range reservations {
-				l.Close()
-			}
-			code = "port_in_use"
-			return
-		}
-		reservations = append(reservations, listener)
-	}
-	defer func() {
-		for _, l := range reservations {
-			l.Close()
-		}
-	}()
 	directory, err = validation.PrivateDirectory()
 	if err != nil {
 		code = "private_config_failed"
@@ -219,9 +210,7 @@ func (m *Manager) run(s *running, r Request) {
 		return
 	}
 	cmd.Stdout, cmd.Stderr = io.Discard, io.Discard
-	for _, l := range reservations {
-		l.Close()
-	}
+	relay.releaseBackend()
 	if s.ctx.Err() != nil {
 		code = "stopped"
 		return
@@ -263,38 +252,13 @@ func (m *Manager) run(s *running, r Request) {
 			code = "listener_timeout"
 			return
 		case <-ticker.C:
-			ready = listenerReady(m.socks, true) && listenerReady(m.http, false)
+			ready = listenerReady(backendSocks, true) && listenerReady(backendHTTP, false)
 		}
 	}
-	m.set(State{Status: "running", Connectivity: "checking"})
-	// Проверка сети не определяет время жизни туннеля и отменяется вместе с ним.
-	network := make(chan error, 1)
-	go func() {
-		ctx, cancel := context.WithTimeout(s.ctx, 25*time.Second)
-		defer cancel()
-		network <- m.check(ctx, m.socks)
-	}()
-	for {
-		select {
-		case <-s.ctx.Done():
-			code = "stopped"
-			return
-		case <-exited:
-			consumed = true
-			code = "engine_exited"
-			return
-		case err := <-network:
-			connectivity := "verified"
-			if err != nil {
-				connectivity = "unverified"
-			}
-			if s.ctx.Err() == nil {
-				m.set(State{Status: "running", Connectivity: connectivity})
-			}
-			network = nil
-		}
-	}
+	relay.start()
+	code, consumed = m.monitor(s, exited, relay)
 }
+
 func listenerReady(address string, socks bool) bool {
 	connection, err := net.DialTimeout("tcp", address, 150*time.Millisecond)
 	if err != nil {

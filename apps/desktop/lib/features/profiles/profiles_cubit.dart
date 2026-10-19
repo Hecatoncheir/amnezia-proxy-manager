@@ -340,6 +340,24 @@ class ProfilesCubit extends Cubit<ProfilesState> {
     }
   }
 
+  Future<void> validateSelected() async {
+    if (_busy || _pending != null) {
+      throw const ProfileProblem('Дождитесь завершения импорта профиля.');
+    }
+    final record = _records.where((e) => e.id == _selected).firstOrNull;
+    if (record == null) {
+      throw const ProfileProblem('Добавьте профиль в настройках профилей.');
+    }
+    _busy = true;
+    _publish(busy: true);
+    try {
+      await validate(record.configuration);
+    } finally {
+      _busy = false;
+      _publish();
+    }
+  }
+
   Future<void> remove(String id) async {
     if (_busy || _locked || _pending != null) return;
     final record = _records.where((e) => e.id == id).firstOrNull;

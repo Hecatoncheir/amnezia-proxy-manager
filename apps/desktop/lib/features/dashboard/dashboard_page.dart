@@ -4,17 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../settings/settings_cubit.dart';
+import '../../settings/settings_page.dart';
 import '../../settings/startup_cubit.dart';
 import '../../settings/proxy_ports_cubit.dart';
 import '../../settings/window_placement.dart';
 import '../connection/connection_cubit.dart';
-import '../updates/updates_view.dart';
+import '../connection/recovery_cubit.dart';
+import '../connection/diagnostics_cubit.dart';
+import '../connection/traffic_cubit.dart';
 import '../engine/engine_manager.dart';
-import '../engine/engine_view.dart';
-import '../engine/engine_panel.dart';
 import '../profiles/profiles_cubit.dart';
-import '../profiles/profiles_view.dart';
 import 'preparation_cubit.dart';
 import 'preparation_view.dart';
 import 'proxy_ports_view.dart';
@@ -29,14 +28,19 @@ class DashboardPage extends StatefulWidget {
   State<DashboardPage> createState() => _DashboardPageState();
 }
 
-class _DashboardPageState extends State<DashboardPage> {
+class _DashboardPageState extends State<DashboardPage>
+    with WidgetsBindingObserver {
   ConnectionCubit? _connection;
   StartupCubit? _startup;
+  RecoveryCubit? _recovery;
+  DiagnosticsCubit? _diagnostics;
+  TrafficCubit? _traffic;
   final _ports = ProxyPortsCubit();
   late final Future<void> _initialization;
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.engine != null &&
         widget.xray != null &&
         widget.profiles != null) {
@@ -50,7 +54,19 @@ class _DashboardPageState extends State<DashboardPage> {
           await widget.profiles!.importDetected();
         },
       );
-      WindowPlacement.beforeClose = _connection!.close;
+      _recovery = RecoveryCubit(_connection!);
+      _traffic = TrafficCubit(_connection!.client.events);
+      _diagnostics = DiagnosticsCubit(
+        connection: _connection!,
+        profiles: widget.profiles!,
+        ports: _ports.forConnection,
+        onFinished: () => _recovery?.reevaluate(),
+        prepare: () async {
+          await _initialization;
+          await widget.profiles!.importDetected();
+        },
+      );
+      WindowPlacement.beforeClose = _closeConnection;
       _startup = StartupCubit();
     }
     if (widget.engine != null) unawaited(widget.engine!.check());
@@ -81,19 +97,21 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<void> _autoconnect() async {
     await _initialization;
     if (mounted && _startup?.state.autoconnect == true) {
-      await _connection?.toggle();
+      await _recovery?.connect();
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     WindowPlacement.beforeClose = null;
     unawaited(_disposeManagers());
     super.dispose();
   }
 
   Future<void> _disposeManagers() async {
-    await _connection?.close();
+    await _closeConnection();
+    await _traffic?.close();
     await _startup?.close();
     await _ports.close();
     if (widget.engine != null) await widget.engine!.close();
@@ -101,45 +119,30 @@ class _DashboardPageState extends State<DashboardPage> {
     if (widget.profiles != null) await widget.profiles!.close();
   }
 
-  void _openMenu(String section) {
-    final content = switch (section) {
-      'profiles' =>
-        widget.profiles == null
-            ? const Text('Профили пока недоступны')
-            : ProfilesView(manager: widget.profiles!, ownsManager: false),
-      'engines' =>
-        widget.engine == null
-            ? const Text('Движки пока недоступны')
-            : widget.xray != null && widget.profiles != null
-            ? EnginePanel(
-                awg: widget.engine!,
-                xray: widget.xray!,
-                profiles: widget.profiles!,
-                ownsManagers: false,
-              )
-            : EngineView(manager: widget.engine!, ownsManager: false),
-      _ => null,
-    };
-    showDialog<void>(
-      context: context,
-      builder: (_) => section == 'settings'
-          ? BlocProvider.value(
-              value: context.read<SettingsCubit>(),
-              child: _SettingsDialog(startup: _startup),
-            )
-          : AlertDialog(
-              title: Text(section == 'profiles' ? 'Профили' : 'Движки'),
-              content: SizedBox(
-                width: 480,
-                child: SingleChildScrollView(child: content),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Готово'),
-                ),
-              ],
-            ),
+  Future<void>? _closing;
+  Future<void> _closeConnection() => _closing ??= _finishConnection();
+  Future<void> _finishConnection() async {
+    await _recovery?.close();
+    await _connection?.close();
+    await _diagnostics?.close();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(_recovery?.resumed());
+  }
+
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SettingsPage(
+          startup: _startup,
+          profiles: widget.profiles,
+          awg: widget.engine,
+          xray: widget.xray,
+          diagnostics: _diagnostics,
+        ),
+      ),
     );
   }
 
@@ -152,9 +155,14 @@ class _DashboardPageState extends State<DashboardPage> {
           child: ListView(
             padding: const EdgeInsets.all(28),
             children: [
-              _Header(onSelected: _openMenu),
+              _Header(onSettings: _openSettings),
               const SizedBox(height: 24),
-              _ConnectionCard(connection: _connection, ports: _ports),
+              _ConnectionCard(
+                connection: _connection,
+                ports: _ports,
+                recovery: _recovery,
+                diagnostics: _diagnostics,
+              ),
               if (widget.profiles != null &&
                   widget.engine != null &&
                   widget.xray != null)
@@ -167,7 +175,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   child: const PreparationView(),
                 ),
               const SizedBox(height: 16),
-              const _TrafficCards(),
+              _TrafficCards(traffic: _traffic),
             ],
           ),
         ),
@@ -177,8 +185,8 @@ class _DashboardPageState extends State<DashboardPage> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.onSelected});
-  final ValueChanged<String> onSelected;
+  const _Header({required this.onSettings});
+  final VoidCallback onSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -208,127 +216,38 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
-        PopupMenuButton<String>(
-          tooltip: 'Меню',
-          icon: Icon(Icons.menu, color: colors.onSurfaceVariant),
-          onSelected: onSelected,
-          itemBuilder: (_) => const [
-            PopupMenuItem(
-              value: 'profiles',
-              child: ListTile(
-                leading: Icon(Icons.vpn_key_outlined),
-                title: Text('Профили'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            PopupMenuItem(
-              value: 'engines',
-              child: ListTile(
-                leading: Icon(Icons.memory_outlined),
-                title: Text('Движки'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            PopupMenuItem(
-              value: 'settings',
-              child: ListTile(
-                leading: Icon(Icons.tune),
-                title: Text('Настройки'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-          ],
+        IconButton(
+          tooltip: 'Настройки',
+          onPressed: onSettings,
+          icon: Icon(Icons.tune, color: colors.onSurfaceVariant),
         ),
       ],
     );
   }
 }
 
-class _SettingsDialog extends StatelessWidget {
-  const _SettingsDialog({this.startup});
-  final StartupCubit? startup;
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Настройки'),
-    content: SizedBox(
-      width: 560,
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            BlocBuilder<SettingsCubit, ThemeMode>(
-              builder: (context, mode) => SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Тёмная тема'),
-                value: mode == ThemeMode.dark,
-                onChanged: (_) => context.read<SettingsCubit>().toggleTheme(),
-              ),
-            ),
-            const Divider(height: 24),
-            if (startup != null)
-              BlocBuilder<StartupCubit, StartupOptions>(
-                bloc: startup,
-                builder: (context, state) => Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Автозапуск'),
-                      subtitle: const Text('При входе в систему'),
-                      value: state.autostart,
-                      onChanged: state.busy ? null : startup!.setAutostart,
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Автоподключение'),
-                      subtitle: const Text(
-                        'Подключать выбранный профиль при запуске приложения',
-                      ),
-                      value: state.autoconnect,
-                      onChanged: state.busy ? null : startup!.setAutoconnect,
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Автозапуск свёрнутым в трей'),
-                      subtitle: const Text(
-                        'При входе в систему, без открытия окна',
-                      ),
-                      value: state.startInTray,
-                      onChanged: state.busy ? null : startup!.setStartInTray,
-                    ),
-                    if (state.message != null)
-                      Text(
-                        state.message!,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                  ],
-                ),
-              ),
-            const Divider(height: 32),
-            const UpdatesView(),
-          ],
-        ),
-      ),
-    ),
-    actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Готово'),
-      ),
-    ],
-  );
-}
-
 class _ConnectionCard extends StatelessWidget {
-  const _ConnectionCard({this.connection, required this.ports});
+  const _ConnectionCard({
+    this.connection,
+    required this.ports,
+    this.recovery,
+    this.diagnostics,
+  });
+  final DiagnosticsCubit? diagnostics;
+  final RecoveryCubit? recovery;
   final ConnectionCubit? connection;
   final ProxyPortsCubit ports;
 
   @override
-  Widget build(BuildContext context) => connection == null
+  Widget build(BuildContext context) {
+    if (diagnostics == null) return _connectionBuilder(context);
+    return BlocBuilder<DiagnosticsCubit, DiagnosticsState>(
+      bloc: diagnostics,
+      builder: (context, _) => _connectionBuilder(context),
+    );
+  }
+
+  Widget _connectionBuilder(BuildContext context) => connection == null
       ? _content(
           context,
           const ProxyConnectionState(ConnectionStatus.disconnected),
@@ -340,17 +259,7 @@ class _ConnectionCard extends StatelessWidget {
 
   Widget _content(BuildContext context, ProxyConnectionState state) {
     final running = state.status == ConnectionStatus.running;
-    final busy =
-        state.status == ConnectionStatus.starting ||
-        state.status == ConnectionStatus.stopping;
-    final label = switch (state.status) {
-      ConnectionStatus.disconnected => 'Отключено',
-      ConnectionStatus.starting => 'Подключение…',
-      ConnectionStatus.stopping => 'Отключение…',
-      ConnectionStatus.error => 'Не подключено',
-      ConnectionStatus.running =>
-        state.connectivity == 'verified' ? 'Подключено' : 'Прокси запущен',
-    };
+    final label = _connectionLabel(state);
     final colors = Theme.of(context).colorScheme;
     return Card(
       child: Padding(
@@ -385,43 +294,25 @@ class _ConnectionCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                IconButton.filled(
-                  tooltip: running
-                      ? 'Отключить'
-                      : state.status == ConnectionStatus.starting
-                      ? 'Отменить подключение'
-                      : 'Подключить',
-                  onPressed:
-                      connection == null ||
-                          state.status == ConnectionStatus.stopping
-                      ? null
-                      : connection!.toggle,
-                  style: IconButton.styleFrom(
-                    padding: const EdgeInsets.all(18),
-                    disabledBackgroundColor: colors.onSurface.withValues(
-                      alpha: 0.08,
-                    ),
-                    foregroundColor: running
-                        ? colors.primary
-                        : Theme.of(context).brightness == Brightness.dark
-                        ? const Color(0xffc7785b)
-                        : const Color(0xffa34f38),
-                    backgroundColor: colors.onSurface.withValues(alpha: 0.08),
-                    disabledForegroundColor:
-                        Theme.of(context).brightness == Brightness.dark
-                        ? const Color(0xffc7785b)
-                        : const Color(0xffa34f38),
-                  ),
-                  icon: busy
-                      ? const SizedBox(
-                          width: 32,
-                          height: 32,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.power_settings_new, size: 32),
+                _PowerButton(
+                  connection: connection,
+                  recovery: recovery,
+                  state: state,
                 ),
               ],
             ),
+            if (recovery != null)
+              BlocBuilder<RecoveryCubit, RecoveryState>(
+                bloc: recovery,
+                builder: (_, state) => state.waiting
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Text(
+                          'Восстановление соединения · попытка ${state.attempt}',
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
             ProxyPortsView(cubit: ports, locked: state.active),
             if (state.message != null || running) ...[
               const SizedBox(height: 12),
@@ -442,37 +333,124 @@ class _ConnectionCard extends StatelessWidget {
   }
 }
 
-class _TrafficCards extends StatelessWidget {
-  const _TrafficCards();
+String _connectionLabel(ProxyConnectionState state) {
+  if (state.status == ConnectionStatus.running) {
+    return state.connectivity == 'verified' ? 'Подключено' : 'Прокси запущен';
+  }
+  return const {
+    ConnectionStatus.disconnected: 'Отключено',
+    ConnectionStatus.starting: 'Подключение…',
+    ConnectionStatus.stopping: 'Отключение…',
+    ConnectionStatus.error: 'Не подключено',
+  }[state.status]!;
+}
 
+class _PowerButton extends StatelessWidget {
+  const _PowerButton({
+    required this.connection,
+    required this.recovery,
+    required this.state,
+  });
+  final ConnectionCubit? connection;
+  final RecoveryCubit? recovery;
+  final ProxyConnectionState state;
   @override
   Widget build(BuildContext context) {
+    if (recovery == null) return _button(context, false);
+    return BlocBuilder<RecoveryCubit, RecoveryState>(
+      bloc: recovery,
+      builder: (context, value) => _button(context, value.waiting),
+    );
+  }
+
+  Widget _button(BuildContext context, bool waiting) {
     final colors = Theme.of(context).colorScheme;
-    final download = _TrafficCard(
-      label: 'Загрузка',
-      icon: Icons.south,
-      color: colors.secondary,
+    final terracotta = Theme.of(context).brightness == Brightness.dark
+        ? const Color(0xffc7785b)
+        : const Color(0xffa34f38);
+    return IconButton.filled(
+      tooltip: _tooltip(waiting),
+      onPressed: _action,
+      style: IconButton.styleFrom(
+        padding: const EdgeInsets.all(18),
+        foregroundColor: state.status == ConnectionStatus.running
+            ? colors.primary
+            : terracotta,
+        disabledForegroundColor: terracotta,
+        backgroundColor: colors.onSurface.withValues(alpha: 0.08),
+        disabledBackgroundColor: colors.onSurface.withValues(alpha: 0.08),
+      ),
+      icon: _busy
+          ? const SizedBox(
+              width: 32,
+              height: 32,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.power_settings_new, size: 32),
     );
-    final upload = _TrafficCard(
-      label: 'Отправка',
-      icon: Icons.north,
-      color: colors.tertiary,
+  }
+
+  bool get _busy => const {
+    ConnectionStatus.starting,
+    ConnectionStatus.stopping,
+  }.contains(state.status);
+  VoidCallback? get _action {
+    if (connection == null ||
+        connection!.diagnosing ||
+        state.status == ConnectionStatus.stopping) {
+      return null;
+    }
+    return recovery?.toggle ?? connection!.toggle;
+  }
+
+  String _tooltip(bool waiting) {
+    if (waiting) return 'Отменить восстановление';
+    if (state.status == ConnectionStatus.running) return 'Отключить';
+    if (state.status == ConnectionStatus.starting) {
+      return 'Отменить подключение';
+    }
+    return 'Подключить';
+  }
+}
+
+class _TrafficCards extends StatelessWidget {
+  const _TrafficCards({this.traffic});
+  final TrafficCubit? traffic;
+  @override
+  Widget build(BuildContext context) {
+    if (traffic == null) return _content(context, const TrafficState());
+    return BlocBuilder<TrafficCubit, TrafficState>(
+      bloc: traffic,
+      builder: _content,
     );
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 480) {
-          return Column(
-            children: [download, const SizedBox(height: 12), upload],
-          );
-        }
-        return Row(
-          children: [
-            Expanded(child: download),
-            const SizedBox(width: 12),
-            Expanded(child: upload),
-          ],
-        );
-      },
+  }
+
+  Widget _content(BuildContext context, TrafficState state) {
+    final colors = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Expanded(
+          child: _TrafficCard(
+            label: 'Загрузка',
+            icon: Icons.south,
+            color: colors.secondary,
+            speed: state.downSpeed,
+            total: state.download,
+            available: state.available,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _TrafficCard(
+            label: 'Отправка',
+            icon: Icons.north,
+            color: colors.tertiary,
+            speed: state.upSpeed,
+            total: state.upload,
+            available: state.available,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -482,11 +460,16 @@ class _TrafficCard extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.color,
+    required this.speed,
+    required this.total,
+    required this.available,
   });
   final String label;
   final IconData icon;
   final Color color;
-
+  final double speed;
+  final int total;
+  final bool available;
   @override
   Widget build(BuildContext context) => Card(
     child: Padding(
@@ -498,21 +481,22 @@ class _TrafficCard extends StatelessWidget {
             children: [
               Icon(icon, size: 18, color: color),
               const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
+              Flexible(child: Text(label)),
             ],
           ),
           const SizedBox(height: 14),
-          const Text(
-            '— КБ/с',
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w600),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              available ? '${formatBytes(speed)}/с' : '— КБ/с',
+              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w600),
+            ),
           ),
           const SizedBox(height: 4),
-          const Text('Нет данных', style: TextStyle(fontSize: 12)),
+          Text(
+            available ? '${formatBytes(total)} за сеанс' : 'Нет данных',
+            style: const TextStyle(fontSize: 12),
+          ),
         ],
       ),
     ),
