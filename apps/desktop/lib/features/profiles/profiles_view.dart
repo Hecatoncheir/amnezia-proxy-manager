@@ -165,6 +165,7 @@ class _ProfilesViewState extends State<ProfilesView> {
   ];
 
   Widget _profileCard(ProfileSummary profile, ProfilesState state) => Card(
+    margin: const EdgeInsets.only(bottom: 12),
     child: ListTile(
       leading: Icon(
         profile.id == state.selected
@@ -198,6 +199,7 @@ class _ProfilesViewState extends State<ProfilesView> {
     if (state.offerTemporary)
       Wrap(
         spacing: 8,
+        runSpacing: 8,
         children: [
           TextButton(
             onPressed: widget.manager.useTemporary,
@@ -216,6 +218,7 @@ class _ProfilesViewState extends State<ProfilesView> {
 
   Widget _actions(ProfilesState state) => Wrap(
     spacing: 8,
+    runSpacing: 8,
     children: [
       TextButton.icon(
         onPressed: _enabled(state) && state.selected != null
@@ -235,6 +238,7 @@ class _ProfilesViewState extends State<ProfilesView> {
   );
 
   Widget _confirmDelete(String id, ProfilesState state) => Card(
+    margin: const EdgeInsets.only(top: 12),
     child: Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -243,8 +247,10 @@ class _ProfilesViewState extends State<ProfilesView> {
           const Text(
             'Удалить копию профиля из менеджера? Профиль в AmneziaVPN и исходный файл останутся.',
           ),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 8,
+            runSpacing: 8,
             children: [
               TextButton(
                 onPressed: _enabled(state)
@@ -290,6 +296,7 @@ class _ProfilesViewState extends State<ProfilesView> {
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
+          runSpacing: 8,
           children: [
             FilledButton(
               onPressed: _enabled(state) ? _import : null,

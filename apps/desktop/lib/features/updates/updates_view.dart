@@ -120,8 +120,10 @@ class _UpdatesViewState extends State<UpdatesView> {
       const Text(
         'Приложение закроется. Установщик обновит его и запустит снова.',
       ),
+      const SizedBox(height: 12),
       Wrap(
         spacing: 8,
+        runSpacing: 8,
         children: [
           FilledButton(
             onPressed: updates.installing
@@ -152,19 +154,25 @@ class _UpdatesViewState extends State<UpdatesView> {
   ];
 
   List<Widget> _downloadErrors() => [
-    if (updates.downloadFailed)
+    if (updates.downloadFailed) ...[
+      const SizedBox(height: 12),
       const Text('Не удалось скачать или проверить файл. Повторите загрузку.'),
-    if (updates.installFailed)
+    ],
+    if (updates.installFailed) ...[
+      const SizedBox(height: 12),
       const Text(
         'Не удалось запустить установщик. Приложение остаётся открытым.',
       ),
+    ],
   ];
 
   List<Widget> _downloadedInfo() {
     final package = updates.downloadedPackage;
     if (package == null) return [];
     return [
+      const SizedBox(height: 12),
       const Text('Пакет загружен. Размер и SHA-256 проверены.'),
+      const SizedBox(height: 8),
       if (Platform.isLinux)
         SelectableText(
           'Закройте приложение и установите обновление командой:\n'
@@ -182,12 +190,15 @@ class _UpdatesViewState extends State<UpdatesView> {
   }
 
   List<Widget> _releaseNotes() => [
-    if (updates.release != null)
+    if (updates.release != null) ...[
+      const SizedBox(height: 24),
       ExpansionTile(
         tilePadding: EdgeInsets.zero,
+        childrenPadding: const EdgeInsets.only(top: 8, bottom: 16),
         title: const Text('Изменения версии'),
         children: [SelectableText(updates.release!.notes)],
       ),
+    ],
   ];
 
   List<Widget> _downloadButtons(bool busy) => [
