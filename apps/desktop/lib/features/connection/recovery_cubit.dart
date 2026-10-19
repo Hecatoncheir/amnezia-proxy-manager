@@ -117,7 +117,8 @@ class RecoveryCubit extends Cubit<RecoveryState> {
     _changed(connection.state);
   }
 
-  bool get _needsRecovery => connection.state.connectivity == 'unverified' ||
+  bool get _needsRecovery =>
+      connection.state.connectivity == 'unverified' ||
       connection.state.status == ConnectionStatus.disconnected;
 
   Future<void> resumed() async {

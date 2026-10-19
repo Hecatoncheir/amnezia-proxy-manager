@@ -1,7 +1,7 @@
 name: amnezia_proxy_manager
 description: 'Кроссплатформенный менеджер локального прокси AmneziaWG.'
 publish_to: none
-version: 0.1.10+11
+version: 0.1.11+12
 environment:
   sdk: ^3.13.5
 dependencies:
