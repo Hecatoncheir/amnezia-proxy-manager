@@ -28,7 +28,12 @@ class _DemoVault implements ProfileVault {
 Future<void> main() async {
   enableFlutterDriverExtension(
     handler: (message) async {
-      final height = message == 'settings-window' ? 780.0 : 640.0;
+      final height = switch (message) {
+        'settings-window' => 940.0,
+        'main-window' => 1040.0,
+        'compact-window' => 640.0,
+        _ => 780.0,
+      };
       await windowManager.setSize(Size(640, height));
       return 'ok';
     },
@@ -37,7 +42,7 @@ Future<void> main() async {
   // ignore: invalid_use_of_visible_for_testing_member
   SharedPreferences.setMockInitialValues({});
   await WindowPlacement.initialize(preferenceKey: 'readme-window');
-  await windowManager.setSize(const Size(640, 640));
+  await windowManager.setSize(const Size(640, 1040));
   final awg = EngineManager(), xray = EngineManager(policy: xrayPolicy);
   final profile = await ProfileCodec().decode(
     utf8.encode(

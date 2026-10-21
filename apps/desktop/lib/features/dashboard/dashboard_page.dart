@@ -78,6 +78,7 @@ class _DashboardPageState extends State<DashboardPage>
     }
     if (widget.engine != null) unawaited(widget.engine!.check());
     if (widget.xray != null) unawaited(widget.xray!.check());
+    unawaited(_tun.check());
     _initialization = _loadProfileAndStartup();
     unawaited(_autoconnect());
   }

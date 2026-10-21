@@ -20,13 +20,20 @@ Future<void> main(List<String> args) async {
   try {
     await driver.runUnsynchronized(() async {
       await driver.waitFor(find.byTooltip('Подключить'));
+      await driver.requestData('main-window');
       await shot('01-main');
       await tap(find.byTooltip('Настройки'));
+      await driver.requestData('compact-window');
       await shot('02-menu');
       await tap(find.text('Движки'));
+      await driver.waitForAbsent(
+        find.text('Проверяем движок…'),
+        timeout: const Duration(seconds: 100),
+      );
       await shot('03-engine');
       await back();
       await tap(find.text('Профили'));
+      await driver.requestData('profiles-window');
       await driver.waitFor(find.text('Мой профиль'));
       await shot('04-profiles');
       await tap(find.text('Из файла'));
@@ -48,12 +55,21 @@ Future<void> main(List<String> args) async {
       await shot('09-profile-checked');
       await back();
       await tap(find.text('Общие'));
+      await driver.requestData('settings-window');
       await shot('08-settings');
+      await tap(find.text('Пропускать весь трафик через VPN'));
+      await driver.scrollIntoView(
+        find.text('Снять блокировку интернета'),
+        alignment: 0.8,
+      );
+      await shot('11-vpn-settings');
       await back();
       await tap(find.text('Диагностика'));
+      await driver.requestData('compact-window');
       await shot('10-diagnostics');
       await back();
       await back();
+      await driver.requestData('main-window');
     });
   } finally {
     await driver.close();
