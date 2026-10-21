@@ -59,7 +59,12 @@ class RecoveryCubit extends Cubit<RecoveryState> {
   }
 
   void _onError(String? code) {
-    const recoverable = {'engine_exited', 'ipc_failed', 'listener_timeout'};
+    const recoverable = {
+      'engine_exited',
+      'ipc_failed',
+      'listener_timeout',
+      'vpn_tun_exited',
+    };
     if (recoverable.contains(code)) {
       _schedule();
       return;
@@ -100,7 +105,7 @@ class RecoveryCubit extends Cubit<RecoveryState> {
       return;
     }
     _restarting = true;
-    await connection.stop();
+    await connection.stop(preserveProtection: true);
     _restarting = false;
     if (!_canRetry) return;
     _lastConnectivity = '';

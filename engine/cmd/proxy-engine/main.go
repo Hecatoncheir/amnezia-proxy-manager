@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/autostart"
+	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/fullvpn"
 	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/localprofile"
 	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/session"
 	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/upstream"
@@ -22,6 +23,35 @@ func main() {
 }
 
 func run(args []string, output io.Writer) error {
+	if len(args) == 1 && args[0] == "--ipc-admin" {
+		if err := fullvpn.Bridge(os.Stdin, output); err != nil {
+			return json.NewEncoder(output).Encode(map[string]any{"version": 1, "event": "state", "state": map[string]any{"status": "error", "code": err.Error()}})
+		}
+		return nil
+	}
+	if len(args) == 2 && args[0] == "--ipc-pipe" {
+		pipe, err := fullvpn.Pipe(args[1])
+		if err != nil {
+			return err
+		}
+		defer pipe.Close()
+		unlock, err := fullvpn.Lock()
+		if err != nil {
+			json.NewEncoder(pipe).Encode(map[string]any{"version": 1, "event": "state", "state": map[string]any{"status": "error", "code": "vpn_already_running"}})
+			return err
+		}
+		defer unlock()
+		return session.Serve(pipe, pipe, true)
+	}
+	if len(args) == 1 && args[0] == "--unblock-vpn" {
+		if !fullvpn.Privileged() {
+			return fmt.Errorf("запустите команду от имени администратора")
+		}
+		if err := fullvpn.Release(); err != nil {
+			return err
+		}
+		return json.NewEncoder(output).Encode(map[string]any{"internetBlocked": false})
+	}
 	if len(args) == 3 && args[0] == "--autostart" {
 		enabled, err := autostart.Apply(args[1], args[2])
 		if err != nil {
@@ -72,6 +102,7 @@ func run(args []string, output io.Writer) error {
 	}
 	return json.NewEncoder(output).Encode(map[string]any{
 		"protocolVersion": 1, "status": "ready", "canStart": true,
+		"canFullVPN": fullvpn.Supported(), "killSwitchDefault": true,
 		"backend": "bropines/awg-wireproxy", "upstreamRevision": upstream.Revision,
 		"backendDistribution": "separate", "backendCliContract": 2,
 		"canValidateConfig": true, "canValidateXray": true, "canImportLocalAmnezia": localprofile.Supported,

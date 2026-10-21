@@ -19,6 +19,7 @@ class TestConnection extends ConnectionCubit {
   TestConnection(ProfilesCubit profiles)
     : super(profiles: profiles, awg: EngineManager(), xray: EngineManager());
   int starts = 0, stops = 0;
+  final preservedStops = <bool>[];
   bool online = true;
   Completer<void>? stopGate;
   void push(ProxyConnectionState value) => emit(value);
@@ -34,8 +35,9 @@ class TestConnection extends ConnectionCubit {
   }
 
   @override
-  Future<void> stop() async {
+  Future<void> stop({bool preserveProtection = false}) async {
     stops++;
+    preservedStops.add(preserveProtection);
     await stopGate?.future;
     push(const ProxyConnectionState(ConnectionStatus.disconnected));
   }
@@ -75,6 +77,55 @@ Future<ProxyPorts> freePorts() async {
 }
 
 void main() {
+  test(
+    'Диагностика после обрыва не снимает уже установленную защиту',
+    () async {
+      final connection = await fixture();
+      connection.push(
+        const ProxyConnectionState(
+          ConnectionStatus.error,
+          code: 'engine_exited',
+          internetBlocked: true,
+        ),
+      );
+      final ports = await freePorts();
+      final diagnostics = DiagnosticsCubit(
+        connection: connection,
+        profiles: connection.profiles,
+        ports: () async => ports,
+        prepare: () async {},
+      );
+      await diagnostics.run();
+      expect(connection.preservedStops, [true]);
+      await diagnostics.close();
+      await connection.dispose();
+    },
+  );
+  test(
+    'После сбоя TUN защита сохраняется при повторе и снимается вручную',
+    () async {
+      final connection = await fixture();
+      final recovery = RecoveryCubit(
+        connection,
+        delay: const Duration(milliseconds: 5),
+      );
+      await recovery.connect();
+      connection.push(
+        const ProxyConnectionState(
+          ConnectionStatus.error,
+          code: 'vpn_tun_exited',
+          internetBlocked: true,
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      expect(connection.starts, 2);
+      expect(connection.preservedStops, [true]);
+      await recovery.stop();
+      expect(connection.preservedStops, [true, false]);
+      await recovery.close();
+      await connection.dispose();
+    },
+  );
   test('Успешный HTTPS отменяет запланированный перезапуск', () async {
     final connection = await fixture();
     final recovery = RecoveryCubit(

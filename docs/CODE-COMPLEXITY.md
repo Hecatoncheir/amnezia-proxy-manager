@@ -1,5 +1,48 @@
 # Простота кода
 
+## Linux/macOS для режима всего трафика, 2026-10-21
+
+Повторное измерение тем же `Hecatoncheir/treesitter_cyclomatic_complexity`, ревизия `7b216f2344d87a910e6c1ffbd974fe60950c15ce`, Neovim 0.12.5, режим `inline`. Результаты: `build/tun-unix/{go,dart}-complexity.tsv`, списки: `build/tun-unix/{go,dart}-files.txt`.
+
+После выделения подготовки файлов, проверки PF и загрузки правил все новые отдельные Go-методы Unix-реализации укладываются в CC/COG ≤ 5. Это не относится ко всем старым обработчикам приложения, перечисленным ниже.
+
+| Метод | CC | COG |
+| --- | ---: | ---: |
+| Unix `Bridge` | 4 | 3 |
+| Linux/macOS `rootPeer` | 5 | 4 |
+| `applyNFT` | 4 | 3 |
+| `applyPF` | 5 | 4 |
+| Linux `Release` | 5 | 4 |
+| macOS `Release` | 3 | 2 |
+| `CheckInterfaceAvailable` | 5 | 5 |
+| `secureStateRoot` | 5 | 4 |
+| `prepareSystemVPN` | 4 | 3 |
+
+Сохранены проверка UID канала, владельца root-каталога, хешей для целевой ОС, конфликтов PF и обработки отказа авторизации. Атомарное обновление nftables и наблюдение за родителем macOS вынесены в небольшие отдельные функции.
+
+## Режим всего трафика, 2026-10-21
+
+Измерение выполнено настоящим `Hecatoncheir/treesitter_cyclomatic_complexity` на ревизии `7b216f2344d87a910e6c1ffbd974fe60950c15ce`, в режиме `inline`, Neovim 0.12.5. Парсеры Dart и Go собраны из закреплённых в инструменте ревизий. Отчёты и списки файлов: `build/tun-audit/{dart,go}-complexity.tsv` и `build/tun-audit/{dart,go}-files.txt`.
+
+После выделения этапов подготовки, проверки файлов, именованного канала и WFP новые отдельные методы режима VPN укладываются в CC/COG ≤ 5:
+
+| Метод | CC | COG |
+| --- | ---: | ---: |
+| `VpnOptionsCubit.load` | 3 | 2 |
+| `VpnOptionsView._trafficSwitch` | 4 | 3 |
+| `ConnectionCubit._prepareTun` | 4 | 3 |
+| `SupervisorClient._stopRequest` | 5 | 4 |
+| `EngineManager._useInstalled` | 2 | 1 |
+| `fullvpn.Protect` | 4 | 3 |
+| `fullvpn.AllowTunnel` | 5 | 5 |
+| `fullvpn.Release` | 5 | 5 |
+| `fullvpn.ValidateProfile` | 4 | 3 |
+| `session.copyVerified` | 5 | 4 |
+| `session.prepareSystemVPN` | 5 | 4 |
+| `Manager.validateStart` | 5 | 4 |
+
+Существующие общие обработчики запуска/IPC остаются выше ориентира: `Manager.run` — 33/37, `configuration` — 12/15, `serveContext` — 21/29; перенесённое тело Windows-запуска процесса `startProcessWithFlags` — 8/8. В Dart выше ориентира остаются общие `toggle`, `stop`, `_read`, `_request` и часть виджетов. Их измерение не означает, что весь репозиторий укладывается в 5. Проверки конфигураций, хешей и дерева процессов сохранены; новый этап TUN выделен из общего сценария, не удаляя эти проверки.
+
 Состояния интерфейса хранятся в Cubit/Bloc, виджеты показывают готовое состояние и передают действия пользователя. Методы должны решать одну понятную задачу; ранний выход предпочтительнее вложенных условий. Правила для следующих изменений находятся в [AGENTS.md](../AGENTS.md).
 
 ## Проверка блока подготовки, 2026-10-18

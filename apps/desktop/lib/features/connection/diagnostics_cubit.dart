@@ -65,6 +65,7 @@ class DiagnosticsCubit extends Cubit<DiagnosticsState> {
       ),
     );
     final temporary = !connection.state.active;
+    final preserveProtection = connection.state.internetBlocked;
     try {
       await _checkStep(
         0,
@@ -91,7 +92,9 @@ class DiagnosticsCubit extends Cubit<DiagnosticsState> {
     } catch (_) {
       // Причина уже записана в соответствующий шаг.
     } finally {
-      if (temporary) await connection.stop();
+      if (temporary) {
+        await connection.stop(preserveProtection: preserveProtection);
+      }
       connection.diagnosing = false;
       onFinished?.call();
       if (!isClosed) emit(DiagnosticsState(steps: state.steps));

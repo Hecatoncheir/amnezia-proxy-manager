@@ -31,12 +31,15 @@ class FakeSupervisor extends SupervisorClient {
     required String configuration,
     int socksPort = 1080,
     int httpPort = 8080,
+    bool allTraffic = false,
+    bool killSwitch = true,
+    String? tunBinary,
   }) async {
     starts++;
   }
 
   @override
-  Future<void> stop() async {
+  Future<void> stop({bool preserveProtection = false}) async {
     stops++;
   }
 }

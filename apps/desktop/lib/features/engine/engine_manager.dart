@@ -50,9 +50,8 @@ class EngineManager extends Cubit<EngineState> {
            directory ??
            (() async {
              final root = await _engineDirectory();
-             return policy['family'] == 'xray'
-                 ? Directory('${root.path}/xray')
-                 : root;
+             if (policy['family'] == 'awg') return root;
+             return Directory('${root.path}/${policy['family']}');
            }),
        super(const EngineState(EngineStatus.checking));
   final Map<String, dynamic> policy;
@@ -76,12 +75,21 @@ class EngineManager extends Cubit<EngineState> {
       await Future<void>.delayed(const Duration(milliseconds: 25));
     }
     if (isClosed) throw StateError('Движок закрыт');
+    if (await _useInstalled()) return;
     await check();
     if (state.installed != null) return;
     await download();
     if (state.installed == null) {
       throw StateError('Не удалось подготовить движок');
     }
+  }
+
+  Future<bool> _useInstalled() async {
+    _store = EngineStore(await directory(), probe: probe, policy: policy);
+    final installed = await _store!.installed(await readVersion(), platform);
+    if (installed == null) return false;
+    _publish(EngineState(EngineStatus.ready, installed: installed));
+    return true;
   }
 
   Future<void> check() async {

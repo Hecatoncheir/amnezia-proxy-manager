@@ -36,11 +36,23 @@ func newJob() (windows.Handle, error) {
 	return job, nil
 }
 func startProcess(cmd *exec.Cmd) (func(), error) {
+	return startProcessWithFlags(cmd, 0)
+}
+
+func startTunnelProcess(cmd *exec.Cmd) (func(), error) {
+	return startProcessWithFlags(cmd, windows.CREATE_NEW_PROCESS_GROUP)
+}
+
+func signalTunnelStop(cmd *exec.Cmd) {
+	windows.GenerateConsoleCtrlEvent(windows.CTRL_BREAK_EVENT, uint32(cmd.Process.Pid))
+}
+
+func startProcessWithFlags(cmd *exec.Cmd, flags uint32) (func(), error) {
 	job, err := newJob()
 	if err != nil {
 		return nil, err
 	}
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: windows.CREATE_SUSPENDED}
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: windows.CREATE_SUSPENDED | flags}
 	if err = cmd.Start(); err != nil {
 		windows.CloseHandle(job)
 		return nil, err

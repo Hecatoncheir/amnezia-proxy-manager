@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/fullvpn"
 	"io"
 	"os"
 	"os/signal"
@@ -15,23 +16,27 @@ import (
 const MaxLine = 512 * 1024
 
 // Serve использует только JSON Lines. stdout/stderr движка никогда не входят в IPC.
-func Serve(input io.Reader, output io.Writer) error {
+func Serve(input io.Reader, output io.Writer, vpnOnly ...bool) error {
 	if GuardSupervisor() != nil {
 		return errors.New("не удалось защитить дерево процессов")
 	}
 	cleanupOrphans()
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	return serveContext(ctx, input, output)
+	return serveContext(ctx, input, output, vpnOnly...)
 }
 func serve(input io.Reader, output io.Writer) error {
 	return serveContext(context.Background(), input, output)
 }
-func serveContext(ctx context.Context, input io.Reader, output io.Writer) error {
+func serveContext(ctx context.Context, input io.Reader, output io.Writer, vpnOnly ...bool) error {
 	var writeMu sync.Mutex
 	write := func(value any) { writeMu.Lock(); defer writeMu.Unlock(); json.NewEncoder(output).Encode(value) }
 	manager := New(func(state State) { write(map[string]any{"version": 1, "event": "state", "state": state}) })
-	defer manager.Stop()
+	manager.vpnOnly = len(vpnOnly) > 0 && vpnOnly[0]
+	if manager.vpnOnly {
+		manager.blocked = fullvpn.IsProtected()
+	}
+	defer manager.stop(true)
 	finished := make(chan struct{})
 	defer close(finished)
 	go func() {
@@ -39,7 +44,7 @@ func serveContext(ctx context.Context, input io.Reader, output io.Writer) error 
 		case <-finished:
 			return
 		case <-ctx.Done():
-			manager.Stop()
+			manager.stop(true)
 			if closer, ok := input.(io.Closer); ok {
 				closer.Close()
 			}
@@ -62,8 +67,9 @@ func serveContext(ctx context.Context, input io.Reader, output io.Writer) error 
 		switch request.Method {
 		case "hello":
 			negotiated = true
-			response["capabilities"] = []string{"start", "stop", "status", "custom_ports", "health_check", "traffic"}
+			response["capabilities"] = []string{"start", "stop", "status", "custom_ports", "health_check", "traffic", "full_vpn", "kill_switch"}
 			response["maxConfigBytes"] = 65536
+			response["internetBlocked"] = manager.blocked
 		case "status":
 			if !negotiated {
 				err = errors.New("handshake_required")
@@ -83,7 +89,7 @@ func serveContext(ctx context.Context, input io.Reader, output io.Writer) error 
 				err = manager.Check()
 			}
 		case "stop":
-			err = manager.Stop()
+			err = manager.stop(request.PreserveProtection)
 			response["state"] = manager.Status()
 		default:
 			err = errors.New("unknown_method")

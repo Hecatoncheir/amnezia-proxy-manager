@@ -44,7 +44,17 @@ jobs:
           go run ./cmd/proxy-engine --capabilities
       - name: Зависимости Linux
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev libsecret-1-dev libx11-dev libxi-dev
+        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev libsecret-1-dev libx11-dev libxi-dev nftables iproute2 util-linux
+      - name: Изолированная проверка блокировки Linux IPv4/IPv6
+        if: runner.os == 'Linux'
+        working-directory: engine
+        run: |
+          go test -c -o "$RUNNER_TEMP/apm-fullvpn.test" ./internal/fullvpn
+          sudo env APM_RUN_NETWORK_TESTS=1 "$RUNNER_TEMP/apm-fullvpn.test" -test.run '^TestLinuxNftIntegration$' -test.v
+      - name: Синтаксис правил PF macOS без изменения сети
+        if: runner.os == 'macOS'
+        working-directory: engine
+        run: APM_VALIDATE_PF=1 go test ./internal/fullvpn -run '^TestPFNativeSyntax$' -v
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.7'

@@ -26,21 +26,29 @@ class SupervisorClient {
   var _next = 0;
   var _dead = false;
   var _supportsPorts = false;
+  var _supportsVpn = false;
+  var _elevated = false;
+  var _protection = false;
+  String? _launchFailure;
+  var _operation = 0;
 
   Future<void> _launch() async {
     try {
       await _spawn();
     } catch (_) {
       _fail();
-      throw const SessionProblem('ipc_failed');
+      throw SessionProblem(_launchFailure ?? 'ipc_failed');
     }
   }
 
   Future<void> _spawn() async {
+    _launchFailure = null;
     if (_dead) throw const SessionProblem('ipc_failed');
     final process =
         await (launchProcess?.call() ??
-            Process.start(executable, ['--ipc'], runInShell: false));
+            Process.start(executable, [
+              _elevated ? '--ipc-admin' : '--ipc',
+            ], runInShell: false));
     _process = process;
     unawaited(process.stderr.drain<void>());
     process.stdout.listen(
@@ -60,6 +68,10 @@ class SupervisorClient {
       throw const SessionProblem('protocol_mismatch');
     }
     _supportsPorts = capabilities.contains('custom_ports');
+    _supportsVpn =
+        capabilities.contains('full_vpn') &&
+        capabilities.contains('kill_switch');
+    _protection = hello['internetBlocked'] == true;
   }
 
   void _read(List<int> bytes) {
@@ -71,6 +83,7 @@ class SupervisorClient {
           _line.clear();
           if (message['version'] != 1) throw const FormatException();
           if (message['event'] == 'state') {
+            _readLaunchFailure(message['state'] as Map);
             _events.add(Map<String, dynamic>.from(message['state'] as Map));
           } else {
             final completer = _pending.remove(message['requestId']);
@@ -85,6 +98,10 @@ class SupervisorClient {
                 'stop_timeout',
                 'invalid_ports',
                 'not_running',
+                'vpn_platform_unsupported',
+                'vpn_admin_required',
+                'vpn_runtime_missing',
+                'vpn_unblock_failed',
               };
               completer.completeError(
                 SessionProblem(
@@ -105,6 +122,16 @@ class SupervisorClient {
     }
   }
 
+  void _readLaunchFailure(Map state) {
+    const codes = {
+      'vpn_elevation_denied',
+      'vpn_elevation_failed',
+      'vpn_already_running',
+      'vpn_authorization_unavailable',
+    };
+    if (codes.contains(state['code'])) _launchFailure = state['code'] as String;
+  }
+
   void _fail([Process? expected]) {
     if (expected != null && expected != _process) return;
     if (_dead) return;
@@ -116,7 +143,11 @@ class SupervisorClient {
     _pending.clear();
     _line.clear();
     if (_closing == null && !_events.isClosed) {
-      _events.add({'status': 'error', 'code': 'ipc_failed'});
+      _events.add({
+        'status': 'error',
+        'code': _launchFailure ?? 'ipc_failed',
+        'internetBlocked': _protection,
+      });
     }
   }
 
@@ -140,7 +171,9 @@ class SupervisorClient {
       }
       _process!.stdin.writeln(message);
       await _process!.stdin.flush();
-      return await completer.future.timeout(const Duration(seconds: 20));
+      return await completer.future.timeout(
+        Duration(seconds: method == 'hello' && _elevated ? 100 : 20),
+      );
     } catch (_) {
       _pending.remove(id);
       _fail();
@@ -155,17 +188,28 @@ class SupervisorClient {
     required String configuration,
     int socksPort = 1080,
     int httpPort = 8080,
+    bool allTraffic = false,
+    bool killSwitch = true,
+    String? tunBinary,
   }) async {
     if (_closing != null) throw const SessionProblem('ipc_failed');
+    final operation = ++_operation;
+    await _selectPrivilege(allTraffic);
+    if (operation != _operation) return;
     if (_dead) {
       _process = null;
       _dead = false;
       _launching = null;
     }
     await (_launching ??= _launch());
+    if (operation != _operation) return;
+    if (allTraffic && !_supportsVpn) {
+      throw const SessionProblem('vpn_unsupported');
+    }
     if (!_supportsPorts && (socksPort != 1080 || httpPort != 8080)) {
       throw const SessionProblem('unsupported_ports');
     }
+    _protection = allTraffic && killSwitch;
     await _request('start', {
       'family': family,
       'binary': binary,
@@ -173,17 +217,48 @@ class SupervisorClient {
       'configuration': configuration,
       'socksPort': socksPort,
       'httpPort': httpPort,
+      'allTraffic': allTraffic,
+      'killSwitch': killSwitch,
+      'tunBinary': tunBinary,
     });
+  }
+
+  Future<void> _selectPrivilege(bool elevated) async {
+    if (_elevated == elevated) return;
+    if (_process != null && !_dead) await _stopRequest(false);
+    await _process?.stdin.close();
+    _process = null;
+    _dead = false;
+    _launching = null;
+    _elevated = elevated;
   }
 
   Future<void> check() async {
     await _request('check');
   }
 
-  Future<void> stop() async {
+  Future<void> stop({bool preserveProtection = false}) async {
+    ++_operation;
+    await _stopRequest(preserveProtection);
+  }
+
+  Future<void> _stopRequest(bool preserveProtection) async {
     if (_launching != null) await _launching;
     if (_process == null || _dead) return;
-    await _request('stop');
+    await _request('stop', {'preserveProtection': preserveProtection});
+    if (!preserveProtection) _protection = false;
+  }
+
+  Future<void> unblock() async {
+    ++_operation;
+    await _selectPrivilege(true);
+    if (_dead) {
+      _process = null;
+      _dead = false;
+      _launching = null;
+    }
+    await (_launching ??= _launch());
+    await stop();
   }
 
   Future<void> abort() async {
@@ -196,7 +271,11 @@ class SupervisorClient {
   Future<void> close() => _closing ??= _close();
   Future<void> _close() async {
     try {
-      await stop();
+      if (_protection && _dead) {
+        await unblock();
+      } else {
+        await stop();
+      }
     } catch (_) {
       /* После сбоя закрываем канал и Job Object. */
     }

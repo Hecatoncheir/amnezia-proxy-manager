@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 Future<void> main() async {
+  var vpn = false;
   await for (final line
       in stdin.transform(utf8.decoder).transform(const LineSplitter())) {
     final request = jsonDecode(line) as Map;
@@ -11,9 +12,24 @@ Future<void> main() async {
       'ok': true,
     };
     if (request['method'] == 'hello') {
-      response['capabilities'] = ['start', 'stop', 'status', 'custom_ports'];
+      response['capabilities'] = [
+        'start',
+        'stop',
+        'status',
+        'custom_ports',
+        'full_vpn',
+        'kill_switch',
+      ];
     }
     if (request['method'] == 'start') {
+      vpn = request['configuration'] == 'vpn_parameters';
+      if (vpn) {
+        response['ok'] =
+            request['allTraffic'] == true &&
+            request['killSwitch'] == true &&
+            request['tunBinary'] == 'tun';
+        response['code'] = 'invalid_config';
+      }
       if (request['configuration'] == 'custom_ports') {
         response['ok'] =
             request['socksPort'] == 19080 && request['httpPort'] == 19081;
@@ -33,6 +49,10 @@ Future<void> main() async {
       );
     }
     if (request['method'] == 'stop') {
+      if (vpn && request['preserveProtection'] is! bool) {
+        response['ok'] = false;
+        response['code'] = 'invalid_config';
+      }
       stdout.writeln(
         jsonEncode({
           'version': 1,

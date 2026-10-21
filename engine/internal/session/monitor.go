@@ -58,7 +58,7 @@ func (m *Manager) setRunning(s *running, connectivity string) {
 	if s.ctx.Err() != nil || m.active != s {
 		return
 	}
-	m.state = State{Status: "running", Connectivity: connectivity, Traffic: m.state.Traffic}
+	m.state = State{Status: "running", Connectivity: connectivity, Traffic: m.state.Traffic, InternetBlocked: m.blocked}
 	if m.publish != nil {
 		m.publish(m.state)
 	}
@@ -127,5 +127,7 @@ func (m *Manager) monitor(s *running, exited <-chan error, relay *relays) (strin
 		return "stopped", false
 	case <-exited:
 		return "engine_exited", true
+	case <-s.tunExited:
+		return "vpn_tun_exited", false
 	}
 }

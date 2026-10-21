@@ -8,6 +8,8 @@ import '../features/profiles/profiles_cubit.dart';
 import '../features/profiles/profiles_view.dart';
 import '../features/updates/updates_view.dart';
 import 'general_settings_view.dart';
+import 'vpn_options_cubit.dart';
+import '../features/connection/connection_cubit.dart';
 import 'startup_cubit.dart';
 
 enum SettingsSection {
@@ -35,11 +37,19 @@ class SettingsPage extends StatelessWidget {
     this.awg,
     this.xray,
     this.diagnostics,
+    this.vpn,
+    this.connection,
+    this.tun,
+    this.onUnblock,
   });
   final StartupCubit? startup;
   final ProfilesCubit? profiles;
   final EngineManager? awg, xray;
   final DiagnosticsCubit? diagnostics;
+  final VpnOptionsCubit? vpn;
+  final ConnectionCubit? connection;
+  final EngineManager? tun;
+  final Future<void> Function()? onUnblock;
 
   @override
   Widget build(BuildContext context) => BlocProvider(
@@ -77,7 +87,12 @@ class SettingsPage extends StatelessWidget {
   Widget _content(BuildContext context, SettingsSection section) {
     final pages = <SettingsSection, Widget Function()>{
       SettingsSection.home: () => _sections(context),
-      SettingsSection.general: () => GeneralSettingsView(startup: startup),
+      SettingsSection.general: () => GeneralSettingsView(
+        startup: startup,
+        vpn: vpn,
+        connection: connection,
+        onUnblock: onUnblock,
+      ),
       SettingsSection.profiles: () => profiles == null
           ? const Text('Профили недоступны')
           : ProfilesView(manager: profiles!, ownsManager: false),
@@ -97,6 +112,10 @@ class SettingsPage extends StatelessWidget {
       if (awg != null) EngineView(manager: awg!, ownsManager: false),
       const SizedBox(height: 16),
       if (xray != null) EngineView(manager: xray!, ownsManager: false),
+      if (tun != null) ...[
+        const SizedBox(height: 16),
+        EngineView(manager: tun!, ownsManager: false),
+      ],
     ],
   );
 

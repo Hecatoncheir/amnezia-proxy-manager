@@ -70,7 +70,11 @@ class EngineStore {
         ? ZipDecoder().decodeBytes(bytes)
         : TarDecoder().decodeBytes(await _gunzip(bytes));
     final matches = unpacked.files
-        .where((entry) => entry.name == release.binaryName)
+        .where(
+          (entry) =>
+              entry.name ==
+              (release.package['archiveBinaryName'] ?? release.binaryName),
+        )
         .toList();
     final licenses = unpacked.files
         .where(
@@ -136,6 +140,10 @@ Future<void> verifyEngineExecutable(
   String platform, {
   Map<String, dynamic> policy = enginePolicy,
 }) async {
+  if (policy['family'] == 'tun') {
+    await _verifyTun(file, platform, policy);
+    return;
+  }
   if (policy['family'] == 'xray') {
     if (!await engineArchitectureMatches(file, platform)) {
       throw const FormatException('Неверная архитектура Xray');
@@ -179,6 +187,25 @@ Future<void> verifyEngineExecutable(
     }
   } finally {
     process.kill();
+  }
+}
+
+Future<void> _verifyTun(
+  File file,
+  String platform,
+  Map<String, dynamic> policy,
+) async {
+  if (!await engineArchitectureMatches(file, platform)) {
+    throw const FormatException('Неверная архитектура TUN');
+  }
+  final result = await Process.run(file.path, [
+    'version',
+  ], runInShell: false).timeout(const Duration(seconds: 10));
+  if (result.exitCode != 0 ||
+      !result.stdout.toString().startsWith(
+        'sing-box version ${policy['version']}\n',
+      )) {
+    throw const FormatException('Несовместимая версия TUN');
   }
 }
 
@@ -229,12 +256,12 @@ Future<bool> _windowsHeader(RandomAccessFile file, ByteData header) async {
 }
 
 Future<List<int>> _gunzip(List<int> bytes) async {
-  final result = <int>[];
+  final result = BytesBuilder(copy: false);
   await for (final chunk in gzip.decoder.bind(Stream.value(bytes))) {
-    if (result.length + chunk.length > 32 * 1024 * 1024) {
+    if (result.length + chunk.length > 256 * 1024 * 1024) {
       throw const FormatException('Архив движка слишком большой');
     }
-    result.addAll(chunk);
+    result.add(chunk);
   }
-  return result;
+  return result.takeBytes();
 }

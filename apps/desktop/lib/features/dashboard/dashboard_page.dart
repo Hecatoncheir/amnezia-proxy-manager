@@ -7,12 +7,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../settings/settings_page.dart';
 import '../../settings/startup_cubit.dart';
 import '../../settings/proxy_ports_cubit.dart';
+import '../../settings/vpn_options_cubit.dart';
+import '../../settings/vpn_options_view.dart';
 import '../../settings/window_placement.dart';
 import '../connection/connection_cubit.dart';
 import '../connection/recovery_cubit.dart';
 import '../connection/diagnostics_cubit.dart';
 import '../connection/traffic_cubit.dart';
 import '../engine/engine_manager.dart';
+import '../engine/tun_policy.dart';
 import '../profiles/profiles_cubit.dart';
 import 'preparation_cubit.dart';
 import 'preparation_view.dart';
@@ -36,6 +39,8 @@ class _DashboardPageState extends State<DashboardPage>
   DiagnosticsCubit? _diagnostics;
   TrafficCubit? _traffic;
   final _ports = ProxyPortsCubit();
+  final _vpn = VpnOptionsCubit();
+  final _tun = EngineManager(policy: tunPolicy);
   late final Future<void> _initialization;
   @override
   void initState() {
@@ -49,6 +54,8 @@ class _DashboardPageState extends State<DashboardPage>
         awg: widget.engine!,
         xray: widget.xray!,
         readPorts: _ports.forConnection,
+        readVpnOptions: () => _vpn.state,
+        tun: _tun,
         prepare: () async {
           await _initialization;
           await widget.profiles!.importDetected();
@@ -80,6 +87,7 @@ class _DashboardPageState extends State<DashboardPage>
       if (widget.profiles != null) widget.profiles!.load(),
       if (_startup != null) _startup!.load(),
       _ports.load(),
+      _vpn.load(),
     ]);
     if (widget.profiles != null) {
       final preferences = await SharedPreferences.getInstance();
@@ -114,6 +122,8 @@ class _DashboardPageState extends State<DashboardPage>
     await _traffic?.close();
     await _startup?.close();
     await _ports.close();
+    await _vpn.close();
+    await _tun.close();
     if (widget.engine != null) await widget.engine!.close();
     if (widget.xray != null) await widget.xray!.close();
     if (widget.profiles != null) await widget.profiles!.close();
@@ -141,9 +151,18 @@ class _DashboardPageState extends State<DashboardPage>
           awg: widget.engine,
           xray: widget.xray,
           diagnostics: _diagnostics,
+          vpn: _vpn,
+          connection: _connection,
+          tun: _tun,
+          onUnblock: _unblockInternet,
         ),
       ),
     );
+  }
+
+  Future<void> _unblockInternet() async {
+    await _recovery?.stop();
+    await _connection?.unblockInternet();
   }
 
   @override
@@ -162,6 +181,17 @@ class _DashboardPageState extends State<DashboardPage>
                 ports: _ports,
                 recovery: _recovery,
                 diagnostics: _diagnostics,
+              ),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: VpnOptionsView(
+                    options: _vpn,
+                    connection: _connection,
+                    onUnblock: _unblockInternet,
+                  ),
+                ),
               ),
               if (widget.profiles != null &&
                   widget.engine != null &&
@@ -314,6 +344,12 @@ class _ConnectionCard extends StatelessWidget {
                     : const SizedBox.shrink(),
               ),
             ProxyPortsView(cubit: ports, locked: state.active),
+            if (state.internetBlocked) ...[
+              const SizedBox(height: 12),
+              Text(
+                running ? 'Блокировка обхода VPN включена.' : 'Сетевые ограничения сохранены. Повторите подключение или снимите блокировку интернета.',
+              ),
+            ],
             if (state.message != null || running) ...[
               const SizedBox(height: 12),
               Text(

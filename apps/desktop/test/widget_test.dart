@@ -67,7 +67,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Общие'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(SwitchListTile));
+    await tester.tap(find.widgetWithText(SwitchListTile, 'Тёмная тема'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Назад'));
     await tester.pumpAndSettle();

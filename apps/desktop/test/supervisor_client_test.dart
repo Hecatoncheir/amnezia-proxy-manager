@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:amnezia_proxy_manager/features/connection/supervisor_client.dart';
@@ -18,6 +19,56 @@ String dartExecutable() {
 }
 
 void main() {
+  test('Отмена во время запуска IPC не допускает поздний start', () async {
+    final gate = Completer<void>();
+    final c = SupervisorClient(
+      launchProcess: () async {
+        await gate.future;
+        return Process.start(dartExecutable(), [
+          'test/fixtures/supervisor_fixture.dart',
+        ]);
+      },
+    );
+    addTearDown(c.close);
+    final statuses = <String>[];
+    final subscription = c.events.listen(
+      (event) => statuses.add(event['status'] as String),
+    );
+    addTearDown(subscription.cancel);
+    final starting = c.start(
+      family: 'xray',
+      binary: 'unused',
+      sha256: 'unused',
+      configuration: 'test',
+    );
+    await Future<void>.delayed(Duration.zero);
+    final stopping = c.stop();
+    gate.complete();
+    await Future.wait([starting, stopping]);
+    expect(statuses, isNot(contains('running')));
+  });
+
+  test(
+    'IPC передаёт режим VPN, защиту по умолчанию и сохранение при повторе',
+    () async {
+      final c = SupervisorClient(
+        launchProcess: () => Process.start(dartExecutable(), [
+          'test/fixtures/supervisor_fixture.dart',
+        ]),
+      );
+      addTearDown(c.close);
+      await c.start(
+        family: 'xray',
+        binary: 'unused',
+        sha256: 'unused',
+        configuration: 'vpn_parameters',
+        allTraffic: true,
+        tunBinary: 'tun',
+      );
+      await c.stop(preserveProtection: true);
+      await c.stop();
+    },
+  );
   SupervisorClient client() => SupervisorClient(
     launchProcess: () => Process.start(dartExecutable(), [
       'test/fixtures/supervisor_fixture.dart',

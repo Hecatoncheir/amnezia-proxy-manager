@@ -3,10 +3,22 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'settings_cubit.dart';
 import 'startup_cubit.dart';
+import 'vpn_options_cubit.dart';
+import 'vpn_options_view.dart';
+import '../features/connection/connection_cubit.dart';
 
 class GeneralSettingsView extends StatelessWidget {
-  const GeneralSettingsView({super.key, this.startup});
+  const GeneralSettingsView({
+    super.key,
+    this.startup,
+    this.vpn,
+    this.connection,
+    this.onUnblock,
+  });
   final StartupCubit? startup;
+  final VpnOptionsCubit? vpn;
+  final ConnectionCubit? connection;
+  final Future<void> Function()? onUnblock;
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -21,6 +33,14 @@ class GeneralSettingsView extends StatelessWidget {
       ),
       const Divider(height: 24),
       if (startup != null) _startupSettings(),
+      if (vpn != null) ...[
+        const Divider(height: 32),
+        VpnOptionsView(
+          options: vpn!,
+          connection: connection,
+          onUnblock: onUnblock,
+        ),
+      ],
       const Divider(height: 32),
       const Text(
         'Восстановление соединения',

@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/fullvpn"
 	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/upstream"
 	"github.com/Hecatoncheir/amnezia-proxy-manager/engine/internal/validation"
 )
@@ -23,27 +24,33 @@ const SocksAddress = "127.0.0.1:1080"
 const HTTPAddress = "127.0.0.1:8080"
 
 type Request struct {
-	Version       int    `json:"version"`
-	ID            string `json:"requestId"`
-	Method        string `json:"method"`
-	Family        string `json:"family,omitempty"`
-	Binary        string `json:"binary,omitempty"`
-	SHA256        string `json:"sha256,omitempty"`
-	Configuration string `json:"configuration,omitempty"`
-	SocksPort     *int   `json:"socksPort,omitempty"`
-	HTTPPort      *int   `json:"httpPort,omitempty"`
+	Version            int    `json:"version"`
+	ID                 string `json:"requestId"`
+	Method             string `json:"method"`
+	Family             string `json:"family,omitempty"`
+	Binary             string `json:"binary,omitempty"`
+	SHA256             string `json:"sha256,omitempty"`
+	Configuration      string `json:"configuration,omitempty"`
+	SocksPort          *int   `json:"socksPort,omitempty"`
+	HTTPPort           *int   `json:"httpPort,omitempty"`
+	AllTraffic         bool   `json:"allTraffic,omitempty"`
+	KillSwitch         *bool  `json:"killSwitch,omitempty"`
+	TunBinary          string `json:"tunBinary,omitempty"`
+	PreserveProtection bool   `json:"preserveProtection,omitempty"`
 }
 type State struct {
-	Status       string   `json:"status"`
-	Connectivity string   `json:"connectivity,omitempty"`
-	Code         string   `json:"code,omitempty"`
-	Traffic      *Traffic `json:"traffic,omitempty"`
+	Status          string   `json:"status"`
+	Connectivity    string   `json:"connectivity,omitempty"`
+	Code            string   `json:"code,omitempty"`
+	Traffic         *Traffic `json:"traffic,omitempty"`
+	InternetBlocked bool     `json:"internetBlocked"`
 }
 type running struct {
-	ctx     context.Context
-	cancel  context.CancelFunc
-	done    chan struct{}
-	recheck chan struct{}
+	ctx       context.Context
+	cancel    context.CancelFunc
+	done      chan struct{}
+	recheck   chan struct{}
+	tunExited <-chan error
 }
 type Manager struct {
 	mu          sync.Mutex
@@ -54,6 +61,9 @@ type Manager struct {
 	command     func(context.Context, Request, string) (*exec.Cmd, error)
 	check       func(context.Context, string) error
 	socks, http string
+	blocked     bool
+	vpnOnly     bool
+	vpnPlans    map[[32]byte]fullvpn.Plan
 }
 
 func New(publish func(State)) *Manager {
@@ -78,6 +88,7 @@ func command(ctx context.Context, r Request, path string) (*exec.Cmd, error) {
 func (m *Manager) set(state State) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	state.InternetBlocked = m.blocked
 	m.state = state
 	if m.publish != nil {
 		m.publish(state)
@@ -87,19 +98,13 @@ func (m *Manager) Status() State { m.mu.Lock(); defer m.mu.Unlock(); return m.st
 func (m *Manager) Start(r Request) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.active != nil {
-		return errors.New("already_running")
-	}
-	if err := r.validate(); err != nil {
-		return err
-	}
-	if err := m.configurePorts(r); err != nil {
+	if err := m.validateStart(r); err != nil {
 		return err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	s := &running{ctx: ctx, cancel: cancel, done: make(chan struct{}), recheck: make(chan struct{}, 1)}
 	m.active = s
-	m.state = State{Status: "starting"}
+	m.state = State{Status: "starting", InternetBlocked: m.blocked}
 	if m.publish != nil {
 		m.publish(m.state)
 	}
@@ -107,7 +112,27 @@ func (m *Manager) Start(r Request) error {
 	return nil
 }
 
+func (m *Manager) validateStart(r Request) error {
+	if m.active != nil {
+		return errors.New("already_running")
+	}
+	if m.vpnOnly && !r.AllTraffic {
+		return errors.New("vpn_admin_required")
+	}
+	if err := r.validate(); err != nil {
+		return err
+	}
+	return m.configurePorts(r)
+}
+
 func (r Request) validate() error {
+	if err := r.validateConfiguration(); err != nil {
+		return err
+	}
+	return r.validateVPN()
+}
+
+func (r Request) validateConfiguration() error {
 	if len(r.Configuration) == 0 || len(r.Configuration) > validation.MaxConfig {
 		return errors.New("invalid_config")
 	}
@@ -117,13 +142,41 @@ func (r Request) validate() error {
 	return nil
 }
 func (m *Manager) Stop() error {
+	return m.stop(false)
+}
+
+func (m *Manager) stop(preserve bool) error {
+	if err := m.stopProcess(); err != nil {
+		return err
+	}
+	if preserve {
+		return nil
+	}
+	return m.releaseProtection()
+}
+
+func (m *Manager) releaseProtection() error {
+	if !m.vpnOnly && !m.blocked {
+		return nil
+	}
+	if err := fullvpn.Release(); err != nil {
+		return errors.New("vpn_unblock_failed")
+	}
+	m.mu.Lock()
+	m.blocked = false
+	m.mu.Unlock()
+	m.set(State{Status: "disconnected"})
+	return nil
+}
+
+func (m *Manager) stopProcess() error {
 	m.mu.Lock()
 	s := m.active
 	if s == nil {
 		m.mu.Unlock()
 		return nil
 	}
-	m.state = State{Status: "stopping"}
+	m.state = State{Status: "stopping", InternetBlocked: m.blocked}
 	if m.publish != nil {
 		m.publish(m.state)
 	}
@@ -150,9 +203,9 @@ func (m *Manager) run(s *running, r Request) {
 		}
 		m.mu.Lock()
 		m.active = nil
-		m.state = State{Status: "error", Code: code}
+		m.state = State{Status: "error", Code: code, InternetBlocked: m.blocked}
 		if s.ctx.Err() != nil && code == "stopped" {
-			m.state = State{Status: "disconnected"}
+			m.state = State{Status: "disconnected", InternetBlocked: m.blocked}
 		}
 		if m.publish != nil {
 			m.publish(m.state)
@@ -160,6 +213,13 @@ func (m *Manager) run(s *running, r Request) {
 		close(s.done)
 		m.mu.Unlock()
 	}()
+	prepared, err := m.prepareSystemVPN(s, r)
+	directory = prepared.directory
+	if err != nil {
+		code = err.Error()
+		return
+	}
+	r = prepared.request
 	if m.verify(r) != nil {
 		code = "untrusted_engine"
 		return
@@ -182,10 +242,12 @@ func (m *Manager) run(s *running, r Request) {
 		code = "stopped"
 		return
 	}
-	directory, err = validation.PrivateDirectory()
-	if err != nil {
-		code = "private_config_failed"
-		return
+	if directory == "" {
+		directory, err = validation.PrivateDirectory()
+		if err != nil {
+			code = "private_config_failed"
+			return
+		}
 	}
 	releaseDirectory, err = ownDirectory(directory)
 	if err != nil {
@@ -205,11 +267,18 @@ func (m *Manager) run(s *running, r Request) {
 		code = "private_config_failed"
 		return
 	}
+	if err := m.enableProtection(r, prepared.plan); err != nil {
+		code = fullvpn.ProtectionError(err)
+		return
+	}
 	cmd, err := m.command(context.Background(), r, path)
 	if err != nil {
 		return
 	}
 	cmd.Stdout, cmd.Stderr = io.Discard, io.Discard
+	if err := configureVPNEnvironment(cmd, r, directory); err != nil {
+		return
+	}
 	relay.releaseBackend()
 	if s.ctx.Err() != nil {
 		code = "stopped"
@@ -256,6 +325,12 @@ func (m *Manager) run(s *running, r Request) {
 		}
 	}
 	relay.start()
+	closeVPN, err := startSystemVPN(s, r, directory, backendSocks, prepared.plan)
+	if err != nil {
+		code = "vpn_tun_failed"
+		return
+	}
+	defer closeVPN()
 	code, consumed = m.monitor(s, exited, relay)
 }
 
@@ -303,7 +378,7 @@ func configuration(r Request, socks, http string) ([]byte, error) {
 	json.Unmarshal([]byte(socksPort), &sp)
 	json.Unmarshal([]byte(httpPort), &hp)
 	data["inbounds"] = []any{
-		map[string]any{"tag": "manager-socks", "listen": "127.0.0.1", "port": sp, "protocol": "socks", "settings": map[string]any{"auth": "noauth", "udp": false}},
+		map[string]any{"tag": "manager-socks", "listen": "127.0.0.1", "port": sp, "protocol": "socks", "settings": map[string]any{"auth": "noauth", "udp": r.AllTraffic}},
 		map[string]any{"tag": "manager-http", "listen": "127.0.0.1", "port": hp, "protocol": "http", "settings": map[string]any{}},
 	}
 	data["log"] = map[string]any{"loglevel": "none"}
