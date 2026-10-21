@@ -1,27 +1,21 @@
-# Иконка приложения
+# Оформление приложения: вариант 03
 
-Общий исходник: `apps/desktop/assets/branding/app_icon.png`, PNG с прозрачными
-углами. Знак — оливковый щит с кремовой линией между двумя узлами на тёмной
-плитке Gruvbox. Он обозначает защищённое прокси-соединение, без текста и букв.
+Выбран пользователем 2026-10-21. Рукописное название **Amnezia**, компактная
+монограмма **a** с плавным подчёркиванием и округлые интерфейсные знаки.
+Палитра Gruvbox сохранена: тёмный фон, кремовый текст и оливковые акценты.
 
-Иконка создана встроенным инструментом `imagegen`. Исходный запрос:
+## Логотип и иконка
 
-```text
-Create a final production desktop application icon for Amnezia Proxy Manager.
-Square 1024x1024 canvas with real transparent outer corners. One centered
-rounded-square dark charcoal tile (#282828), occupying 88% of the canvas,
-softly rounded corners and a very subtle warm edge. Inside it, one bold
-beautifully balanced olive-lime (#b8bb26) geometric shield outline. Inside
-the shield, a single simple warm cream (#ebdbb2) connection path with two
-round terminal nodes, suggesting a protected proxy relay: one node upper
-left, one node lower right, joined by a thick clean angular S-like route.
-Strong negative space, flat crisp vector-like shapes with only a tiny
-restrained material depth on the tile. Gruvbox desktop aesthetic, confident
-understated technical tool, legible at 16 and 32 pixels, precise symmetry
-of outer shield, no letters, no text, no arrows outside the shield, no lock,
-no gradients, no glow, no watermark. Deliver only the single app icon,
-not a sheet, mockup, or presentation.
-```
+- `apps/desktop/assets/branding/app_icon.png` — исходная PNG-иконка с прозрачными
+  внешними углами, тёмной плиткой и кремовой монограммой.
+- `apps/desktop/assets/branding/wordmark.png` — рукописное название с прозрачным
+  фоном. В шапке Flutter оно окрашивается цветом текста текущей темы.
+- `apps/desktop/assets/branding/app_icon_256.png` — вариант для Linux и трея.
+
+Исходные растровые изображения подготовлены встроенным `imagegen` из одобренного
+варианта 03: отдельно выделены нижняя левая иконка и верхнее рукописное название.
+Это PNG, а не векторные исходники. Рукописное название используется в шапке;
+обычный текст интерфейса набран Nunito Sans.
 
 `python tools/prepare_icons.py` подготавливает размеры для Windows ICO,
 macOS AppIcon и PNG 256 px для меню Linux. Требуется Python с Pillow.
@@ -29,13 +23,37 @@ macOS AppIcon и PNG 256 px для меню Linux. Требуется Python с 
 
 Использование:
 
-- Шапка интерфейса Flutter.
+- Рукописное название в шапке Flutter и сайта; отдельная монограмма рядом с ним не дублируется.
 - Ресурс Windows EXE: заголовок окна, панель задач, ярлыки, значок файла.
 - Windows Setup и значок удаления приложения.
 - macOS AppIcon: Finder, Dock, содержимое DMG; тот же значок для тома DMG.
 - Linux: значок GTK-окна, запись `.desktop` и каталог значков hicolor.
 - README проекта.
 
-Функциональные значки подключения, настроек и направления трафика сохраняют
-своё назначение. На странице репозитория GitHub отдельный аватар не поддерживается;
-README показывает общий значок без изменения аватара владельца.
+## Интерфейсные значки
+
+В `apps/desktop/assets/icons/` находятся 20 отдельных SVG с сеткой `24×24`,
+скруглёнными окончаниями и соединениями, толщиной линии `2.2`. Их можно открыть
+в редакторе векторной графики и использовать отдельно в UI/UX-макетах.
+
+Набор: питание, настройки, профили, движок, диагностика, обновление, загрузка,
+отправка, ссылка, снятие блокировки, назад, далее, удаление, файл, импорт,
+подтверждение, маршрут, туннель, защита и разрыв соединения.
+
+Это заново построенные векторные пиктограммы в стиле концепта, а не вырезанные
+фрагменты презентации. В Flutter их показывает `BrandIcon` через `flutter_svg`.
+Размер, цвет и прозрачность наследуются от `IconTheme`, поэтому выключенные
+кнопки и светлая тема сохраняют обычное поведение. Подписи и подсказки остаются
+на кнопках; декоративные SVG исключены из дерева доступности. Стандартные
+индикаторы успеха, ошибки и выбора профиля сохраняют привычный смысл.
+
+После замены оформления проверьте обе темы, минимальное окно и крупный текст,
+пересоздайте платформенные иконки и обновите снимки README через Flutter Driver.
+
+## Шрифты
+
+Приложение и сайт используют Nunito для заголовков, Nunito Sans для основного
+текста и JetBrains Mono для портов, протоколов, скорости и технических подписей.
+Полные переменные TTF с кириллицей хранятся локально. Исходная ревизия Google
+Fonts, SHA-256 и лицензии SIL OFL: `apps/desktop/assets/fonts/README.md`.
+Во время работы шрифты не загружаются с Google Fonts.

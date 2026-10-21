@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../theme/brand_icon.dart';
+
 import '../features/connection/connection_cubit.dart';
 import 'vpn_options_cubit.dart';
 
@@ -77,7 +79,7 @@ class VpnOptionsView extends StatelessWidget {
       const SizedBox(height: 16),
       OutlinedButton.icon(
         onPressed: connection!.state.active ? null : onUnblock,
-        icon: const Icon(Icons.lock_open),
+        icon: const BrandIcon(BrandGlyph.unlock),
         label: const Text('Снять блокировку интернета'),
       ),
       const SizedBox(height: 8),

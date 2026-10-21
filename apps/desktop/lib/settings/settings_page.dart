@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../theme/brand_icon.dart';
+
 import '../features/connection/diagnostics_cubit.dart';
 import '../features/engine/engine_manager.dart';
 import '../features/engine/engine_view.dart';
@@ -59,7 +61,7 @@ class SettingsPage extends StatelessWidget {
         appBar: AppBar(
           leading: IconButton(
             tooltip: 'Назад',
-            icon: const Icon(Icons.arrow_back),
+            icon: const BrandIcon(BrandGlyph.back),
             onPressed: () {
               if (section == SettingsSection.home) {
                 Navigator.pop(context);
@@ -124,31 +126,31 @@ class SettingsPage extends StatelessWidget {
       _tile(
         context,
         SettingsSection.general,
-        Icons.tune,
+        BrandGlyph.settings,
         'Тема и запуск приложения',
       ),
       _tile(
         context,
         SettingsSection.profiles,
-        Icons.vpn_key_outlined,
+        BrandGlyph.profile,
         'Выбор, импорт и проверка',
       ),
       _tile(
         context,
         SettingsSection.engines,
-        Icons.memory_outlined,
+        BrandGlyph.engine,
         'AmneziaWG и VLESS · Xray',
       ),
       _tile(
         context,
         SettingsSection.diagnostics,
-        Icons.health_and_safety_outlined,
+        BrandGlyph.diagnostics,
         'Проверить подключение и найти причину сбоя',
       ),
       _tile(
         context,
         SettingsSection.updates,
-        Icons.system_update_outlined,
+        BrandGlyph.update,
         'Версия приложения и новые выпуски',
       ),
     ],
@@ -157,16 +159,16 @@ class SettingsPage extends StatelessWidget {
   Widget _tile(
     BuildContext context,
     SettingsSection section,
-    IconData icon,
+    BrandGlyph icon,
     String description,
   ) => Card(
     margin: const EdgeInsets.only(bottom: 12),
     child: ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      leading: Icon(icon),
+      leading: BrandIcon(icon),
       title: Text(section.title),
       subtitle: Text(description),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: const BrandIcon(BrandGlyph.next),
       onTap: () => context.read<SettingsNavigation>().open(section),
     ),
   );
@@ -189,7 +191,7 @@ class DiagnosticsView extends StatelessWidget {
           const SizedBox(height: 16),
           FilledButton.icon(
             onPressed: state.busy ? null : manager!.run,
-            icon: const Icon(Icons.fact_check_outlined),
+            icon: const BrandIcon(BrandGlyph.diagnostics),
             label: Text(state.busy ? 'Проверяем…' : 'Проверить подключение'),
           ),
           const SizedBox(height: 16),

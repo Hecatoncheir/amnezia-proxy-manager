@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="ru" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#22251f" />
+    <meta
+      name="description"
+      content="Amnezia Proxy Manager — AmneziaWG и VLESS, полный VPN и локальные SOCKS5/HTTP-прокси для Windows, macOS и Linux."
+    />
+    <meta
+      property="og:title"
+      content="Amnezia Proxy Manager — твой трафик, твои правила"
+    />
+    <meta
+      property="og:description"
+      content="Полный VPN или локальный прокси. Один профиль. Три платформы."
+    />
+    <meta
+      property="og:image"
+      content="https://hecatoncheir.github.io/amnezia-proxy-manager/assets/branding/app_icon_256.png"
+    />
+    <link
+      rel="canonical"
+      href="https://hecatoncheir.github.io/amnezia-proxy-manager/"
+    />
+    <link rel="icon" type="image/png" href="assets/branding/app_icon_256.png" />
+    <link
+      rel="preload"
+      href="assets/fonts/NunitoSans.ttf"
+      as="font"
+      type="font/ttf"
+      crossorigin
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="app.js" defer></script>
+    <title>Amnezia Proxy Manager</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">К содержимому</a>
+    <div class="page">
+      <header class="header">
+        <a class="brand" href="./" aria-label="Amnezia Proxy Manager — главная">
+          <span class="wordmark" aria-hidden="true"></span>
+        </a>
+        <nav class="nav" aria-label="Основные ссылки">
+          <a
+            href="https://github.com/Hecatoncheir/amnezia-proxy-manager#первый-запуск"
+            >Инструкция <span aria-hidden="true">↗</span></a
+          >
+          <a href="https://github.com/Hecatoncheir/amnezia-proxy-manager"
+            >GitHub <span aria-hidden="true">↗</span></a
+          >
+          <button
+            class="theme-button"
+            type="button"
+            aria-label="Включить светлую тему"
+            title="Сменить тему"
+          >
+            <span aria-hidden="true">◐</span>
+          </button>
+        </nav>
+      </header>
+
+      <main class="hero" id="main">
+        <section class="intro" aria-labelledby="title">
+          <div class="eyebrow">
+            <span class="status-dot" aria-hidden="true"></span> DESKTOP · OPEN
+            SOURCE
+          </div>
+          <h1 id="title">Твой трафик.<br /><span>Твои правила.</span></h1>
+          <p class="description">
+            AmneziaWG и VLESS в одном приложении.<br />Весь трафик через VPN или
+            локальный прокси.
+          </p>
+          <div class="features" aria-label="Возможности">
+            <span
+              ><i class="icon icon--route" aria-hidden="true"></i>SOCKS5 +
+              HTTP</span
+            >
+            <span
+              ><i class="icon icon--protection" aria-hidden="true"></i
+              >Блокировка при обрыве</span
+            >
+          </div>
+          <div class="download-area">
+            <a
+              class="download-button"
+              id="download"
+              href="https://github.com/Hecatoncheir/amnezia-proxy-manager/releases/latest/download/AmneziaProxyManager-Setup-windows-x64.exe"
+              ><span id="download-label">Скачать для Windows</span
+              ><i class="icon icon--download" aria-hidden="true"></i
+            ></a>
+            <div
+              class="platforms"
+              role="group"
+              aria-label="Платформа для скачивания"
+            >
+              <button type="button" data-platform="windows" aria-pressed="true">
+                Windows <small>x64</small>
+              </button>
+              <button type="button" data-platform="macos" aria-pressed="false">
+                macOS <small>arm64</small>
+              </button>
+              <button type="button" data-platform="linux" aria-pressed="false">
+                Linux <small>x64</small>
+              </button>
+            </div>
+            <div class="download-meta">
+              <a
+                id="release"
+                href="https://github.com/Hecatoncheir/amnezia-proxy-manager/releases/latest"
+                >Последний выпуск ↗</a
+              ><span>Нужен свой VPN-профиль</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="visual" aria-label="Иллюстрация маршрута трафика">
+          <div class="visual-heading">
+            <span class="mono">01 / СХЕМА МАРШРУТА</span
+            ><span class="visual-badge">AmneziaWG / VLESS</span>
+          </div>
+          <div class="illustration" data-mode="all">
+            <svg
+              class="network"
+              viewBox="0 0 640 510"
+              role="img"
+              aria-labelledby="diagram-title diagram-desc"
+            >
+              <title id="diagram-title">
+                Трафик проходит через выбранный VPN-профиль
+              </title>
+              <desc id="diagram-desc">
+                Схематическая иллюстрация, а не состояние реального подключения.
+                Локальные SOCKS5 и HTTP доступны в обоих режимах.
+              </desc>
+              <defs>
+                <pattern
+                  id="dots"
+                  width="16"
+                  height="16"
+                  patternUnits="userSpaceOnUse"
+                >
+                  <circle cx="1" cy="1" r=".8" fill="currentColor" />
+                </pattern>
+                <linearGradient id="fade" x2="0" y2="1">
+                  <stop stop-color="white" />
+                  <stop offset="1" stop-color="white" stop-opacity="0" />
+                </linearGradient>
+                <mask id="dot-mask">
+                  <ellipse
+                    cx="332"
+                    cy="259"
+                    rx="290"
+                    ry="223"
+                    fill="url(#fade)"
+                  />
+                </mask>
+              </defs>
+              <g class="dot-field" mask="url(#dot-mask)">
+                <rect width="640" height="510" fill="url(#dots)" />
+              </g>
+              <g class="orbit-lines" fill="none">
+                <ellipse
+                  cx="330"
+                  cy="270"
+                  rx="220"
+                  ry="124"
+                  transform="rotate(-28 330 270)"
+                />
+                <ellipse
+                  cx="330"
+                  cy="270"
+                  rx="244"
+                  ry="156"
+                  transform="rotate(-28 330 270)"
+                />
+              </g>
+              <path
+                class="route-track"
+                d="M126 153C214 153 160 255 294 255S402 141 535 164"
+              />
+              <path
+                class="route-packets"
+                d="M126 153C214 153 160 255 294 255S402 141 535 164"
+              />
+              <path
+                class="route-track"
+                d="M111 280C192 280 192 276 294 276S411 317 531 317"
+              />
+              <path
+                class="route-packets route-packets--second"
+                d="M111 280C192 280 192 276 294 276S411 317 531 317"
+              />
+              <g class="system-route">
+                <path
+                  class="route-track"
+                  d="M157 398C238 398 190 299 294 299S399 418 501 418"
+                />
+                <path
+                  class="route-packets route-packets--third"
+                  d="M157 398C238 398 190 299 294 299S399 418 501 418"
+                />
+              </g>
+              <g class="node" transform="translate(54 121)">
+                <rect width="139" height="63" rx="18" />
+                <circle cx="24" cy="30" r="5" />
+                <text x="41" y="35">Браузер</text>
+              </g>
+              <g class="node" transform="translate(22 248)">
+                <rect width="156" height="63" rx="18" />
+                <path d="m18 23 7 7-7 7m16 0h8" />
+                <text x="53" y="35">Терминал</text>
+              </g>
+              <g class="node system-node" transform="translate(81 367)">
+                <rect width="155" height="63" rx="18" />
+                <rect
+                  class="mini-window"
+                  x="19"
+                  y="21"
+                  width="23"
+                  height="19"
+                  rx="4"
+                />
+                <text x="54" y="35">Система</text>
+              </g>
+              <g class="destination" transform="translate(452 104)">
+                <rect width="146" height="115" rx="24" />
+                <circle cx="73" cy="37" r="13" />
+                <path d="M60 37h26m-13-13c-9 7-9 19 0 26m0-26c9 7 9 19 0 26" />
+                <text x="73" y="83" text-anchor="middle">Интернет</text>
+              </g>
+              <g class="local-label" transform="translate(439 296)">
+                <rect width="160" height="48" rx="14" />
+                <text x="80" y="29" text-anchor="middle">SOCKS5 / HTTP</text>
+              </g>
+              <g class="plate">
+                <path d="m238 331 89-46 105 45-89 48-105-47Z" />
+                <path d="m238 345 105 47 89-48m-194 14 105 47 89-48" />
+              </g>
+              <image
+                class="diagram-logo"
+                href="assets/branding/app_icon_256.png"
+                x="225"
+                y="159"
+                width="207"
+                height="207"
+              />
+              <g class="profile-label" transform="translate(266 388)">
+                <text x="64" text-anchor="middle">Ваш профиль</text>
+                <path d="M47 18h34" />
+              </g>
+              <circle class="route-end" cx="531" cy="418" r="4" />
+            </svg>
+          </div>
+          <div class="mode-area">
+            <div
+              class="mode-buttons"
+              role="group"
+              aria-label="Иллюстрация режима"
+            >
+              <button type="button" data-mode="all" aria-pressed="true">
+                <i class="icon icon--tunnel" aria-hidden="true"></i>Все
+                приложения
+              </button>
+              <button type="button" data-mode="proxy" aria-pressed="false">
+                <i class="icon icon--link" aria-hidden="true"></i>Только прокси
+              </button>
+            </div>
+            <p class="mode-caption" aria-live="polite">
+              Локальные прокси остаются доступны.
+            </p>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <span>Меньше настроек. Больше контроля.</span>
+        <a
+          href="https://github.com/Hecatoncheir/amnezia-proxy-manager/blob/main/docs/TUN.md"
+          >Возможности и ограничения <span aria-hidden="true">↗</span></a
+        >
+      </footer>
+    </div>
+  </body>
+</html>

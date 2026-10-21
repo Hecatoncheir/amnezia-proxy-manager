@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../theme/brand_icon.dart';
+
 import 'engine_manager.dart';
 import 'download_ring.dart';
 
@@ -45,8 +47,8 @@ class _EngineViewState extends State<EngineView> {
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.memory_outlined,
+                BrandIcon(
+                  BrandGlyph.engine,
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(width: 12),
@@ -55,7 +57,10 @@ class _EngineViewState extends State<EngineView> {
                       widget.selector ??
                       Text(
                         widget.manager.policy['label'] as String,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          fontFamily: 'JetBrainsMono',
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                 ),
                 if (state.status == EngineStatus.ready)
@@ -77,7 +82,7 @@ class _EngineViewState extends State<EngineView> {
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: widget.manager.download,
-                icon: const Icon(Icons.download_outlined),
+                icon: const BrandIcon(BrandGlyph.download),
                 label: Text('Скачать движок ${state.release!.tag}'),
               ),
             ],

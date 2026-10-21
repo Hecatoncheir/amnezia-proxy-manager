@@ -57,7 +57,10 @@ void main() {
     expect(
       tester
           .widget<IconButton>(
-            find.widgetWithIcon(IconButton, Icons.power_settings_new),
+            find.byWidgetPredicate(
+              (widget) =>
+                  widget is IconButton && widget.tooltip == 'Подключить',
+            ),
           )
           .onPressed,
       isNull,
@@ -77,7 +80,7 @@ void main() {
       Theme.of(tester.element(find.byType(Scaffold))).brightness,
       Brightness.light,
     );
-    expect(find.text('ЛОКАЛЬНЫЙ ПРОКСИ'), findsOneWidget);
+    expect(find.byTooltip('Настройки'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

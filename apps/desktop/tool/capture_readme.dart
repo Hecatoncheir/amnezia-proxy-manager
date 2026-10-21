@@ -22,6 +22,7 @@ Future<void> main(List<String> args) async {
       await driver.waitFor(find.byTooltip('Подключить'));
       await driver.requestData('main-window');
       await shot('01-main');
+      if (args.contains('--main-only')) return;
       await tap(find.byTooltip('Настройки'));
       await driver.requestData('compact-window');
       await shot('02-menu');

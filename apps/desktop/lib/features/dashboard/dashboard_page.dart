@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../theme/brand_icon.dart';
+
 import '../../settings/settings_page.dart';
 import '../../settings/startup_cubit.dart';
 import '../../settings/proxy_ports_cubit.dart';
@@ -224,33 +226,22 @@ class _Header extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     return Row(
       children: [
-        Image.asset(
-          'assets/branding/app_icon.png',
-          width: 52,
-          height: 52,
-          semanticLabel: 'Amnezia Proxy',
-        ),
-        const SizedBox(width: 12),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Amnezia Proxy',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'ЛОКАЛЬНЫЙ ПРОКСИ',
-                style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
-              ),
-            ],
+          child: Image.asset(
+            'assets/branding/wordmark.png',
+            width: 180,
+            height: 60,
+            alignment: Alignment.centerLeft,
+            fit: BoxFit.contain,
+            color: colors.onSurface,
+            colorBlendMode: BlendMode.srcIn,
+            semanticLabel: 'Amnezia Proxy Manager',
           ),
         ),
         IconButton(
           tooltip: 'Настройки',
           onPressed: onSettings,
-          icon: Icon(Icons.tune, color: colors.onSurfaceVariant),
+          icon: BrandIcon(BrandGlyph.settings, color: colors.onSurfaceVariant),
         ),
       ],
     );
@@ -423,7 +414,7 @@ class _PowerButton extends StatelessWidget {
               height: 32,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : const Icon(Icons.power_settings_new, size: 32),
+          : const BrandIcon(BrandGlyph.power, size: 32),
     );
   }
 
@@ -469,7 +460,7 @@ class _TrafficCards extends StatelessWidget {
         Expanded(
           child: _TrafficCard(
             label: 'Загрузка',
-            icon: Icons.south,
+            icon: BrandGlyph.download,
             color: colors.secondary,
             speed: state.downSpeed,
             total: state.download,
@@ -480,7 +471,7 @@ class _TrafficCards extends StatelessWidget {
         Expanded(
           child: _TrafficCard(
             label: 'Отправка',
-            icon: Icons.north,
+            icon: BrandGlyph.upload,
             color: colors.tertiary,
             speed: state.upSpeed,
             total: state.upload,
@@ -502,7 +493,7 @@ class _TrafficCard extends StatelessWidget {
     required this.available,
   });
   final String label;
-  final IconData icon;
+  final BrandGlyph icon;
   final Color color;
   final double speed;
   final int total;
@@ -516,7 +507,7 @@ class _TrafficCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 18, color: color),
+              BrandIcon(icon, size: 18, color: color),
               const SizedBox(width: 8),
               Flexible(child: Text(label)),
             ],
@@ -526,7 +517,11 @@ class _TrafficCard extends StatelessWidget {
             fit: BoxFit.scaleDown,
             child: Text(
               available ? '${formatBytes(speed)}/с' : '— КБ/с',
-              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                fontFamily: 'JetBrainsMono',
+                fontSize: 26,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
           const SizedBox(height: 4),

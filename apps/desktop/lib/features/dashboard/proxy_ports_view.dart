@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../../theme/brand_icon.dart';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -45,7 +48,7 @@ class ProxyPortsView extends StatelessWidget {
             IconButton(
               tooltip: 'Сохранить порты',
               onPressed: enabled && state.changed ? cubit.save : null,
-              icon: const Icon(Icons.check),
+              icon: const BrandIcon(BrandGlyph.check),
             ),
           ],
         ),
@@ -81,6 +84,7 @@ class _PortField extends StatelessWidget {
     key: ValueKey('proxy-port-$label'),
     initialValue: value,
     enabled: enabled,
+    style: const TextStyle(fontFamily: 'JetBrainsMono'),
     keyboardType: TextInputType.number,
     inputFormatters: [
       FilteringTextInputFormatter.digitsOnly,

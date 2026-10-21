@@ -5,6 +5,8 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../theme/brand_icon.dart';
+
 import 'profile_codec.dart';
 import 'profiles_cubit.dart';
 
@@ -139,17 +141,17 @@ class _ProfilesViewState extends State<ProfilesView> {
     children: [
       OutlinedButton.icon(
         onPressed: _enabled(state) ? () => widget.manager.importLocal() : null,
-        icon: const Icon(Icons.move_to_inbox_outlined),
+        icon: const BrandIcon(BrandGlyph.importProfile),
         label: const Text('Из AmneziaVPN'),
       ),
       OutlinedButton.icon(
         onPressed: _enabled(state) ? () => _editor.open('file') : null,
-        icon: const Icon(Icons.file_open_outlined),
+        icon: const BrandIcon(BrandGlyph.file),
         label: const Text('Из файла'),
       ),
       OutlinedButton.icon(
         onPressed: _enabled(state) ? () => _editor.open('link') : null,
-        icon: const Icon(Icons.link),
+        icon: const BrandIcon(BrandGlyph.link),
         label: const Text('По ссылке'),
       ),
     ],
@@ -224,14 +226,14 @@ class _ProfilesViewState extends State<ProfilesView> {
         onPressed: _enabled(state) && state.selected != null
             ? widget.manager.checkSelected
             : null,
-        icon: const Icon(Icons.fact_check_outlined),
+        icon: const BrandIcon(BrandGlyph.diagnostics),
         label: const Text('Проверить профиль'),
       ),
       TextButton.icon(
         onPressed: _enabled(state) && state.selected != null
             ? () => _editor.open('delete:${state.selected}')
             : null,
-        icon: const Icon(Icons.delete_outline),
+        icon: const BrandIcon(BrandGlyph.delete),
         label: const Text('Удалить из менеджера'),
       ),
     ],

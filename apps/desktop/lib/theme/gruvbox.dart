@@ -18,10 +18,25 @@ ThemeData gruvboxTheme(Brightness brightness) {
         tertiary: Color(dark ? 0xffd3869b : 0xff8f3f71),
         error: Color(dark ? 0xfffb4934 : 0xff9d0006),
       );
+  final base = ThemeData(
+    brightness: brightness,
+    fontFamily: 'NunitoSans',
+  ).textTheme.apply(bodyColor: foreground, displayColor: foreground);
+  final headings = base.apply(fontFamily: 'Nunito');
   return ThemeData(
     useMaterial3: true,
-    fontFamily: 'monospace',
-    fontFamilyFallback: const ['Consolas', 'Menlo', 'DejaVu Sans Mono'],
+    fontFamily: 'NunitoSans',
+    textTheme: base.copyWith(
+      displayLarge: headings.displayLarge,
+      displayMedium: headings.displayMedium,
+      displaySmall: headings.displaySmall,
+      headlineLarge: headings.headlineLarge,
+      headlineMedium: headings.headlineMedium,
+      headlineSmall: headings.headlineSmall,
+      titleLarge: headings.titleLarge,
+      titleMedium: headings.titleMedium,
+      titleSmall: headings.titleSmall,
+    ),
     colorScheme: scheme,
     scaffoldBackgroundColor: background,
     cardTheme: CardThemeData(

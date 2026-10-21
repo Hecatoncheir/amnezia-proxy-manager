@@ -4,13 +4,15 @@
 
 Кроссплатформенный Flutter Desktop интерфейс для локального SOCKS5/HTTP-прокси и полного VPN через AmneziaWG или VLESS. Целевые ОС: Windows, macOS и Linux; оформление Gruvbox Dark/Light.
 
-**[Скачать последнюю версию](https://github.com/Hecatoncheir/amnezia-proxy-manager/releases/latest)** · [История изменений](Changelog.md) · [План реализации](TODO.md)
+**[Сайт проекта](https://hecatoncheir.github.io/amnezia-proxy-manager/)** · **[Скачать последнюю версию](https://github.com/Hecatoncheir/amnezia-proxy-manager/releases/latest)** · [История изменений](Changelog.md) · [План реализации](TODO.md)
 
 Менеджер запускает собственный сетевой движок и предоставляет локальный прокси для браузера и других программ. Для работы нужен действующий клиентский профиль AmneziaWG или VLESS. После импорта AmneziaVPN можно закрыть: соединением управляет сам менеджер.
 
 ![Главный экран: состояние прокси и круглая кнопка подключения](docs/screenshots/01-main.png)
 
 Скриншоты сделаны в Windows. «Мой профиль» — демонстрационный профиль без реальных ключей. Для снимков окно увеличено; начальный размер приложения — 540×540, размер и положение запоминаются.
+
+В v0.1.15 используется новое оформление: рукописный логотип и монограмма **a**. Отдельные [SVG-значки для UI/UX](apps/desktop/assets/icons/) и правила использования описаны в [BRANDING.md](docs/BRANDING.md).
 
 ## Содержание
 
