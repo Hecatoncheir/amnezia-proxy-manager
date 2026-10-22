@@ -6,10 +6,16 @@ import 'package:amnezia_proxy_manager/features/engine/engine_manager.dart';
 import 'package:amnezia_proxy_manager/features/engine/engine_store.dart';
 import 'package:flutter/widgets.dart';
 
+import 'probe_github_client.dart';
+
 Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
   final root = Directory(arguments.single);
+  final client = ProbeGitHubClient(
+    token: Platform.environment['GH_TOKEN'] ?? '',
+  );
   final manager = EngineManager(
+    client: client,
     readVersion: () async => '0.1.1',
     directory: () async => root,
   );
@@ -26,6 +32,7 @@ Future<void> main(List<String> arguments) async {
     'catalogStatus': catalogStatus,
     'offline': offline,
     'platform': manager.platform,
+    'responses': client.responses,
     'status': manager.state.status.name,
     'restored': restored?.tag,
   });
