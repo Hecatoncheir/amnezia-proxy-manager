@@ -14,18 +14,23 @@ Future<void> main(List<String> arguments) async {
     directory: () async => root,
   );
   await manager.check();
+  final catalogStatus = manager.state.status.name;
+  final offline = manager.state.offline;
   await manager.download();
   final restored = await EngineStore(root).installed('0.1.1', manager.platform);
   final passed = manager.state.status == EngineStatus.ready && restored != null;
   await root.create(recursive: true);
-  await File('${root.path}/probe-result.json').writeAsString(
-    jsonEncode({
-      'passed': passed,
-      'catalog': 'github',
-      'status': manager.state.status.name,
-      'restored': restored?.tag,
-    }),
-  );
+  final report = jsonEncode({
+    'passed': passed,
+    'catalog': 'github',
+    'catalogStatus': catalogStatus,
+    'offline': offline,
+    'platform': manager.platform,
+    'status': manager.state.status.name,
+    'restored': restored?.tag,
+  });
+  await File('${root.path}/probe-result.json').writeAsString(report);
+  stdout.writeln(report);
   await manager.close();
   exit(passed ? 0 : 1);
 }
