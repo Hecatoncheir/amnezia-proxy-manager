@@ -44,7 +44,7 @@ func TestGuardFixture(t *testing.T) {
 	os.Exit(0)
 }
 func TestEOFAndSupervisorDeath(t *testing.T) {
-	if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
+	if runtime.GOOS != "windows" && runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
 		t.Skip("авария supervisor требует отдельной проверки этой ОС")
 	}
 	for _, crash := range []bool{false, true} {

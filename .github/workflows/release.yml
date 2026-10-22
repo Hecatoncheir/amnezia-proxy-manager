@@ -61,6 +61,12 @@ jobs:
         if: runner.os == 'macOS'
         working-directory: engine
         run: APM_VALIDATE_PF=1 go test ./internal/fullvpn -run '^TestPFNativeSyntax$' -v
+      - name: Временный DNS macOS и очистка после аварии
+        if: runner.os == 'macOS'
+        working-directory: engine
+        run: |
+          go test -c -o "$RUNNER_TEMP/apm-dns.test" ./internal/fullvpn
+          sudo env APM_VALIDATE_DNS=1 "$RUNNER_TEMP/apm-dns.test" -test.run '^TestMacDNSLifecycle$' -test.v -test.timeout=30s
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.7'
@@ -75,6 +81,14 @@ jobs:
           dart format --output=none --set-exit-if-changed lib test
           flutter analyze
           flutter test
+      - name: Загрузка и запуск настоящего движка macOS
+        if: runner.os == 'macOS'
+        working-directory: apps/desktop
+        timeout-minutes: 5
+        run: |
+          flutter build macos --release -t tool/engine_install_probe.dart
+          build/macos/Build/Products/Release/amnezia_proxy_manager.app/Contents/MacOS/amnezia_proxy_manager "$RUNNER_TEMP/apm-engine-probe"
+          python3 -c 'import json, os; from pathlib import Path; result=json.loads((Path(os.environ["RUNNER_TEMP"])/"apm-engine-probe/probe-result.json").read_text()); print(result); assert result["passed"]'
       - name: Сборка
         working-directory: apps/desktop
         shell: bash

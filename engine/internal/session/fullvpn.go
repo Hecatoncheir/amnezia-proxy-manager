@@ -163,9 +163,10 @@ func configureVPNEnvironment(cmd *exec.Cmd, r Request, directory string) error {
 }
 
 type vpnProcess struct {
-	cmd    *exec.Cmd
-	exited chan error
-	kill   func()
+	cmd        *exec.Cmd
+	exited     chan error
+	kill       func()
+	releaseDNS func()
 }
 
 func vpnInterfaceReady() bool {
@@ -205,13 +206,25 @@ func startVPN(ctx context.Context, r Request, directory, socks string, plan full
 	if err != nil {
 		return nil, err
 	}
-	process := &vpnProcess{cmd: cmd, exited: make(chan error, 1), kill: kill}
+	process := &vpnProcess{cmd: cmd, exited: make(chan error, 1), kill: kill, releaseDNS: func() {}}
 	go func() { cmd.Wait(); close(process.exited) }()
-	if err := process.ready(ctx, r.KillSwitchEnabled()); err != nil {
+	if err := process.prepare(ctx, r.KillSwitchEnabled()); err != nil {
 		process.close()
 		return nil, err
 	}
 	return process, nil
+}
+
+func (p *vpnProcess) prepare(ctx context.Context, protect bool) error {
+	if err := p.ready(ctx, protect); err != nil {
+		return err
+	}
+	releaseDNS, err := fullvpn.ConfigureDNS()
+	if err != nil {
+		return err
+	}
+	p.releaseDNS = releaseDNS
+	return nil
 }
 
 func writeTUNConfiguration(directory, socks string, plan fullvpn.Plan) (string, error) {
@@ -267,6 +280,7 @@ func (p *vpnProcess) interfaceStep(ctx context.Context, timeout, tick <-chan tim
 }
 
 func (p *vpnProcess) close() {
+	defer p.releaseDNS()
 	select {
 	case <-p.exited:
 		p.kill()

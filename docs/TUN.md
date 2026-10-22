@@ -107,3 +107,22 @@ go test ./internal/fullvpn -run TestRealTunConfiguration -v
 - [ ] Проверка взаимодействия с другими VPN, защитным ПО и совпадением выбранных подсетей.
 
 Прохождение модульных тестов и `sing-box check` не подтверждает эти сетевые сценарии. Их нельзя считать проверенными в реальной сети на основании сборки.
+
+## Дополнения macOS v0.1.16
+
+DMG-поставка работает вне App Sandbox: загружаемые проверенные движки и привилегированный supervisor запускаются как обычные процессы macOS. Gatekeeper и SIP не отключаются.
+
+После появления `utun233` supervisor создаёт временный системный резолвер `172.31.255.2` для всех доменов через SystemConfiguration Dynamic Store. Это нужно, потому что консольный sing-box не заменяет DNS локального роутера в системном резолвере macOS. Постоянные DNS-настройки сетевых служб не меняются. Ключ принадлежит сессии Dynamic Store и удаляется при штатной остановке или гибели supervisor.
+
+Нативная проверка с текущим профилем, запросом прав администратора, HTTPS без прокси, маршрутом TUN, повторным подключением и снятием защиты:
+
+```sh
+cd apps/desktop
+flutter build macos --release -t tool/full_vpn_probe.dart
+cd ../..
+python3 tools/build_supervisor.py --configuration release
+codesign --force --deep --preserve-metadata=entitlements,requirements,flags --sign - apps/desktop/build/macos/Build/Products/Release/amnezia_proxy_manager.app
+apps/desktop/build/macos/Build/Products/Release/amnezia_proxy_manager.app/Contents/MacOS/amnezia_proxy_manager /tmp/apm-fullvpn-report.json
+```
+
+Это отдельная тестовая точка входа. После неё для поставки обязательно выполнить обычную `flutter build macos --release` с основной точкой входа. Профиль остаётся в памяти; JSON-отчёт содержит только результаты проверок.

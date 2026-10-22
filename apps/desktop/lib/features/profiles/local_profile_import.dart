@@ -11,15 +11,7 @@ Future<List<int>> readLocalAmneziaProfile() async {
   ], runInShell: false);
   try {
     final stderr = process.stderr.drain<void>();
-    final bytes = <int>[];
-    await for (final chunk in process.stdout.timeout(
-      const Duration(seconds: 60),
-    )) {
-      if (bytes.length + chunk.length > maxProfileBytes) {
-        throw const ProfileProblem('Профиль AmneziaVPN слишком большой.');
-      }
-      bytes.addAll(chunk);
-    }
+    final bytes = await _readProfileBytes(process.stdout);
     final code = await process.exitCode.timeout(const Duration(seconds: 2));
     await stderr;
     if (code != 0 || bytes.isEmpty) {
@@ -31,4 +23,19 @@ Future<List<int>> readLocalAmneziaProfile() async {
   } finally {
     process.kill();
   }
+}
+
+Future<List<int>> _readProfileBytes(Stream<List<int>> output) async {
+  // Первый импорт macOS может ждать два подтверждения Связки ключей.
+  final timeout = Platform.isMacOS
+      ? const Duration(minutes: 3)
+      : const Duration(seconds: 60);
+  final bytes = <int>[];
+  await for (final chunk in output.timeout(timeout)) {
+    if (bytes.length + chunk.length > maxProfileBytes) {
+      throw const ProfileProblem('Профиль AmneziaVPN слишком большой.');
+    }
+    bytes.addAll(chunk);
+  }
+  return bytes;
 }

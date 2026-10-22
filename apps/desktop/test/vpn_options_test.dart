@@ -45,24 +45,57 @@ void main() {
         ),
       ),
     );
-    expect(find.text('Пропускать весь трафик через VPN'), findsOneWidget);
-    expect(find.text('Блокировать интернет при обрыве VPN'), findsOneWidget);
-    final traffic = find.widgetWithText(
-      SwitchListTile,
-      'Пропускать весь трафик через VPN',
-    );
+    expect(find.text('Весь трафик'), findsOneWidget);
+    expect(find.text('Защита при обрыве'), findsOneWidget);
+    final traffic = find.widgetWithText(SwitchListTile, 'Весь трафик');
     expect(tester.widget<SwitchListTile>(traffic).onChanged, isNotNull);
     expect(
       tester
           .widget<SwitchListTile>(
-            find.widgetWithText(
-              SwitchListTile,
-              'Блокировать интернет при обрыве VPN',
-            ),
+            find.widgetWithText(SwitchListTile, 'Защита при обрыве'),
           )
           .value,
       true,
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Переключатели стоят рядом и меняют независимые настройки', (
+    tester,
+  ) async {
+    final options = VpnOptionsCubit();
+    addTearDown(options.close);
+    tester.view.physicalSize = const Size(540, 540);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Padding(
+            padding: const EdgeInsets.all(48),
+            child: VpnOptionsView(options: options),
+          ),
+        ),
+      ),
+    );
+    final switches = find.byType(SwitchListTile);
+    expect(
+      tester.getTopLeft(switches.first).dy,
+      tester.getTopLeft(switches.last).dy,
+    );
+    expect(
+      tester.getRect(switches.first).right + 16,
+      tester.getRect(switches.last).left,
+    );
+    await tester.tap(find.text('Весь трафик'));
+    await tester.pumpAndSettle();
+    expect(options.state.allTraffic, true);
+    expect(options.state.killSwitch, true);
+    await tester.tap(find.text('Защита при обрыве'));
+    await tester.pumpAndSettle();
+    expect(options.state.allTraffic, true);
+    expect(options.state.killSwitch, false);
     expect(tester.takeException(), isNull);
   });
 }
