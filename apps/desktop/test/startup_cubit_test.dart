@@ -3,6 +3,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:amnezia_proxy_manager/settings/startup_cubit.dart';
 
 void main() {
+  test('Настройка закрытия наследуется и сохраняется независимо', () async {
+    SharedPreferences.setMockInitialValues({
+      StartupCubit.minimizeToTrayKey: true,
+    });
+    final settings = StartupCubit(autostartCommand: (_) async => false);
+    await settings.load();
+    expect(settings.state.closeToTray, true);
+    await settings.setCloseToTray(false);
+    expect(settings.state.minimizeToTray, true);
+    await settings.close();
+    final restored = StartupCubit(autostartCommand: (_) async => false);
+    await restored.load();
+    expect(restored.state.closeToTray, false);
+    expect(restored.state.minimizeToTray, true);
+    await restored.close();
+  });
+
   test('Сворачивание в трей сохраняется отдельно от автозапуска', () async {
     SharedPreferences.setMockInitialValues({});
     final calls = <String>[];

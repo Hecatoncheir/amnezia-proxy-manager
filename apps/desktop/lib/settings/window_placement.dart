@@ -19,6 +19,7 @@ class WindowPlacement with WindowListener {
   static Future<void> Function()? beforeClose;
   static Future<void> Function()? afterClose;
   static Future<bool> Function()? tryHideToTray;
+  static Future<bool> Function()? tryCloseToTray;
   static Future<void> quit() async => _active?.close();
   static Future<void> show() async {
     if (await windowManager.isMinimized()) await windowManager.restore();
@@ -133,7 +134,7 @@ class WindowPlacement with WindowListener {
 
   Future<void> requestClose() async {
     if (_closing) return;
-    if (await tryHideToTray?.call() == true) return;
+    if (await tryCloseToTray?.call() == true) return;
     await close();
   }
 

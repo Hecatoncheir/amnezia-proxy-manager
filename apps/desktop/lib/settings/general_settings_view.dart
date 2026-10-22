@@ -88,12 +88,21 @@ class GeneralSettingsView extends StatelessWidget {
       SwitchListTile(
         contentPadding: EdgeInsets.zero,
         title: const Text('Сворачивать в трей'),
-        subtitle: const Text(
-          'При сворачивании и закрытии окна. Для завершения работы выберите «Выход» в меню трея.',
-        ),
+        subtitle: const Text('При нажатии кнопки сворачивания окна.'),
         value: state.minimizeToTray,
         onChanged: state.busy ? null : startup!.setMinimizeToTray,
       ),
+      const SizedBox(height: 8),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Сворачивать в трей при закрытии'),
+        subtitle: const Text(
+          'Сохранять соединение после закрытия окна. Для завершения работы выберите «Выйти» в меню трея.',
+        ),
+        value: state.closeToTray,
+        onChanged: state.busy ? null : startup!.setCloseToTray,
+      ),
+      const SizedBox(height: 8),
       _message(state),
     ],
   );

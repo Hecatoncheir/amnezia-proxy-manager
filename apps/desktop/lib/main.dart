@@ -23,6 +23,8 @@ Future<void> main(List<String> arguments) async {
   WindowPlacement.tryHideToTray = () => tray.minimizeIfEnabled(
     preferences.getBool(StartupCubit.minimizeToTrayKey) ?? false,
   );
+  WindowPlacement.tryCloseToTray = () =>
+      tray.minimizeIfEnabled(StartupCubit.shouldCloseToTray(preferences));
   await tray.start(
     hidden: StartupCubit.shouldStartInTray(arguments, preferences),
   );

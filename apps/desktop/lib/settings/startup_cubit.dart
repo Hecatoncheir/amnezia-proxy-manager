@@ -10,10 +10,16 @@ class StartupOptions {
     this.autoconnect = false,
     this.startInTray = false,
     this.minimizeToTray = false,
+    this.closeToTray = false,
     this.busy = false,
     this.message,
   });
-  final bool autostart, autoconnect, startInTray, minimizeToTray, busy;
+  final bool autostart,
+      autoconnect,
+      startInTray,
+      minimizeToTray,
+      closeToTray,
+      busy;
   final String? message;
 }
 
@@ -24,6 +30,11 @@ class StartupCubit extends Cubit<StartupOptions> {
   SharedPreferences? preferences;
   static const autoConnectKey = 'auto-connect-v1';
   static const startInTrayKey = 'start-in-tray-v1';
+  static const closeToTrayKey = 'close-to-tray-v1';
+  static bool shouldCloseToTray(SharedPreferences preferences) =>
+      preferences.getBool(closeToTrayKey) ??
+      preferences.getBool(minimizeToTrayKey) ??
+      false;
   static const minimizeToTrayKey = 'minimize-to-tray-v1';
   static bool shouldStartInTray(
     List<String> arguments,
@@ -51,6 +62,12 @@ class StartupCubit extends Cubit<StartupOptions> {
     _publish(busy: true);
     try {
       preferences ??= await SharedPreferences.getInstance();
+      if (!preferences!.containsKey(closeToTrayKey)) {
+        await preferences!.setBool(
+          closeToTrayKey,
+          shouldCloseToTray(preferences!),
+        );
+      }
       final autoconnect = preferences!.getBool(autoConnectKey) ?? false;
       final startInTray = preferences!.getBool(startInTrayKey) ?? false;
       final minimizeToTray = preferences!.getBool(minimizeToTrayKey) ?? false;
@@ -58,6 +75,7 @@ class StartupCubit extends Cubit<StartupOptions> {
         autoconnect: autoconnect,
         startInTray: startInTray,
         minimizeToTray: minimizeToTray,
+        closeToTray: shouldCloseToTray(preferences!),
         busy: true,
       );
       final enabled = await _command('status');
@@ -79,6 +97,23 @@ class StartupCubit extends Cubit<StartupOptions> {
         throw const FormatException();
       }
       _publish(minimizeToTray: enabled);
+    } catch (_) {
+      _publish(message: 'Не удалось сохранить настройку сворачивания в трей.');
+    } finally {
+      _busy = false;
+    }
+  }
+
+  Future<void> setCloseToTray(bool enabled) async {
+    if (_busy) return;
+    _busy = true;
+    _publish(busy: true);
+    try {
+      preferences ??= await SharedPreferences.getInstance();
+      if (!await preferences!.setBool(closeToTrayKey, enabled)) {
+        throw const FormatException();
+      }
+      _publish(closeToTray: enabled);
     } catch (_) {
       _publish(message: 'Не удалось сохранить настройку сворачивания в трей.');
     } finally {
@@ -155,6 +190,7 @@ class StartupCubit extends Cubit<StartupOptions> {
     bool? autoconnect,
     bool? startInTray,
     bool? minimizeToTray,
+    bool? closeToTray,
     bool busy = false,
     String? message,
   }) {
@@ -165,6 +201,7 @@ class StartupCubit extends Cubit<StartupOptions> {
           autoconnect: autoconnect ?? state.autoconnect,
           startInTray: startInTray ?? state.startInTray,
           minimizeToTray: minimizeToTray ?? state.minimizeToTray,
+          closeToTray: closeToTray ?? state.closeToTray,
           busy: busy,
           message: message,
         ),

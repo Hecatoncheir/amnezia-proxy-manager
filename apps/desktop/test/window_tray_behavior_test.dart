@@ -24,9 +24,11 @@ void main() {
         hidden++;
         return true;
       };
+      WindowPlacement.tryCloseToTray = WindowPlacement.tryHideToTray;
       addTearDown(() {
         WindowPlacement.beforeClose = null;
         WindowPlacement.tryHideToTray = null;
+        WindowPlacement.tryCloseToTray = null;
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
             .setMockMethodCallHandler(channel, null);
       });
