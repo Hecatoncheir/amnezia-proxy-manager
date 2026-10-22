@@ -156,6 +156,14 @@ func (m *Manager) stop(preserve bool) error {
 }
 
 func (m *Manager) releaseProtection() error {
+	if err := m.clearProtection(); err != nil {
+		return err
+	}
+	m.set(State{Status: "disconnected"})
+	return nil
+}
+
+func (m *Manager) clearProtection() error {
 	if !m.vpnOnly && !m.blocked {
 		return nil
 	}
@@ -165,7 +173,6 @@ func (m *Manager) releaseProtection() error {
 	m.mu.Lock()
 	m.blocked = false
 	m.mu.Unlock()
-	m.set(State{Status: "disconnected"})
 	return nil
 }
 
@@ -193,26 +200,7 @@ func (m *Manager) run(s *running, r Request) {
 	code := "start_failed"
 	directory := ""
 	var releaseDirectory func()
-	defer func() {
-		s.cancel()
-		if releaseDirectory != nil {
-			releaseDirectory()
-		}
-		if directory != "" && os.RemoveAll(directory) != nil {
-			code = "cleanup_failed"
-		}
-		m.mu.Lock()
-		m.active = nil
-		m.state = State{Status: "error", Code: code, InternetBlocked: m.blocked}
-		if s.ctx.Err() != nil && code == "stopped" {
-			m.state = State{Status: "disconnected", InternetBlocked: m.blocked}
-		}
-		if m.publish != nil {
-			m.publish(m.state)
-		}
-		close(s.done)
-		m.mu.Unlock()
-	}()
+	defer func() { m.finishRun(s, r, directory, releaseDirectory, code) }()
 	prepared, err := m.prepareSystemVPN(s, r)
 	directory = prepared.directory
 	if err != nil {
@@ -390,4 +378,30 @@ func configuration(r Request, socks, http string) ([]byte, error) {
 	}
 	// Отделяем буфер от JSON-объектов вызывающей стороны.
 	return bytes.Clone(encoded), err
+}
+
+func (m *Manager) finishRun(s *running, r Request, directory string, releaseDirectory func(), code string) {
+	s.cancel()
+	code = m.finishTemporaryProtection(r, code)
+	if releaseDirectory != nil {
+		releaseDirectory()
+	}
+	if directory != "" && os.RemoveAll(directory) != nil {
+		code = "cleanup_failed"
+	}
+	m.publishFinished(s, code)
+}
+
+func (m *Manager) publishFinished(s *running, code string) {
+	m.mu.Lock()
+	m.active = nil
+	m.state = State{Status: "error", Code: code, InternetBlocked: m.blocked}
+	if s.ctx.Err() != nil && code == "stopped" {
+		m.state = State{Status: "disconnected", InternetBlocked: m.blocked}
+	}
+	if m.publish != nil {
+		m.publish(m.state)
+	}
+	close(s.done)
+	m.mu.Unlock()
 }

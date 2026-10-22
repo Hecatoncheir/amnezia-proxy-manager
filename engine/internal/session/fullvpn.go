@@ -114,7 +114,7 @@ func prepareVPNFiles(result vpnPreparation) (vpnPreparation, error) {
 }
 
 func (m *Manager) enableProtection(r Request, plan fullvpn.Plan) error {
-	if !r.KillSwitchEnabled() {
+	if !r.trafficProtectionEnabled() {
 		return nil
 	}
 	m.mu.Lock()
@@ -208,7 +208,7 @@ func startVPN(ctx context.Context, r Request, directory, socks string, plan full
 	}
 	process := &vpnProcess{cmd: cmd, exited: make(chan error, 1), kill: kill, releaseDNS: func() {}}
 	go func() { cmd.Wait(); close(process.exited) }()
-	if err := process.prepare(ctx, r.KillSwitchEnabled()); err != nil {
+	if err := process.prepare(ctx, r.trafficProtectionEnabled()); err != nil {
 		process.close()
 		return nil, err
 	}
